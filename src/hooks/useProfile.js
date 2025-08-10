@@ -1,51 +1,59 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useState, useEffect } from 'react'
+import { getSupabase } from '@/lib/supabaseClient'
 
 export function useProfile(userId) {
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    async function loadProfile() {
+    const loadProfile = async () => {
+      if (!userId) {
+        setLoading(false)
+        return
+      }
+
       try {
-        setLoading(true);
-        setError(null);
+        const supabase = getSupabase()
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
 
-        // Fetch both profile tables in parallel
-        const [profileResult, userProfileResult] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single(),
-          supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', userId)
-            .single()
-        ]);
+        if (error) throw error
 
-        if (profileResult.error) throw profileResult.error;
-        if (userProfileResult.error) throw userProfileResult.error;
-
-        // Combine both profiles
-        setProfile({
-          ...profileResult.data,
-          ...userProfileResult.data
-        });
+        setProfile(data)
+        setError(null)
       } catch (err) {
-        console.error('Error loading profile:', err);
-        setError(err.message);
+        console.error('Error loading profile:', err)
+        setError(err)
+        
+        // If profile doesn't exist, create it
+        if (err.code === '406') {
+          try {
+            const supabase = getSupabase()
+            const { data, error: insertError } = await supabase
+              .from('user_profiles')
+              .insert([{ id: userId }])
+              .select()
+              .single()
+
+            if (insertError) throw insertError
+            setProfile(data)
+            setError(null)
+          } catch (insertErr) {
+            console.error('Error creating profile:', insertErr)
+            setError(insertErr)
+          }
+        }
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
 
-    if (userId) {
-      loadProfile();
-    }
-  }, [userId]);
+    loadProfile()
+  }, [userId])
 
-  return { profile, loading, error };
+  return { profile, loading, error }
 }

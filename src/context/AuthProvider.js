@@ -1,35 +1,24 @@
 'use client';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabase } from '@/lib/supabaseClient';
 
-const AuthContext = createContext({
-  user: null,
-  loading: true,
-  refreshSession: () => {},
-});
+const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponentClient();
-
-  const refreshSession = async () => {
-    try {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-      if (error) throw error;
-      setUser(session?.user ?? null);
-    } catch (error) {
-      console.error('Error refreshing session:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const supabase = getSupabase();
 
   useEffect(() => {
-    refreshSession();
+    const loadSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      setLoading(false);
+    };
+
+    loadSession();
 
     const {
       data: { subscription },
@@ -38,19 +27,11 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
 
-    return () => {
-      subscription?.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const value = {
-    user,
-    loading,
-    refreshSession,
-  };
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, loading }}>
       {children}
     </AuthContext.Provider>
   );
