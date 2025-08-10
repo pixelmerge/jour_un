@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const Container = styled.div`
   display: flex;
@@ -64,12 +65,17 @@ export default function LoginPage() {
   };
   
   const handleGoogleLogin = async () => {
+    const supabase = createClientComponentClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        },
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    })
   };
 
   return (
