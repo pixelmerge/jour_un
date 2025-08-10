@@ -8,8 +8,7 @@ export async function GET(request) {
   try {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin
-
+    const origin = process.env.NEXT_PUBLIC_SITE_URL
     if (code) {
       const supabase = createRouteHandlerClient({ cookies })
       await supabase.auth.exchangeCodeForSession(code)
@@ -19,6 +18,6 @@ export async function GET(request) {
     return NextResponse.redirect(`${origin}/login`)
   } catch (error) {
     console.error('Auth error:', error)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL || request.url.origin}/login`)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL }/login`)
   }
 }
