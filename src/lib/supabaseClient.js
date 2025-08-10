@@ -7,13 +7,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
+// Create a single instance
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     storageKey: 'jour-un-auth',
-    autoRefreshToken: true
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   }
 })
-
-// Export a function to get the singleton instance
-export const getSupabase = () => supabase

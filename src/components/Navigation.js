@@ -1,9 +1,11 @@
+'use client';
 import Link from 'next/link';
 import styled from '@emotion/styled';
 import { useAuth } from '@/context/AuthProvider';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/context/ThemeProvider';
+import { Logo } from './ui/Logo';
 
 const Nav = styled.nav`
   position: fixed;
@@ -16,6 +18,12 @@ const Nav = styled.nav`
   background: ${({ theme }) => theme.background.secondary};
   border-bottom: 1px solid ${({ theme }) => theme.border.primary};
   z-index: 100;
+`;
+
+const NavContainer = styled.div`
+  display: flex;
+  align-items: center;
+  width: 100%;
 `;
 
 const NavItems = styled.div`
@@ -106,7 +114,7 @@ const ThemeToggle = styled.button`
   }
 `;
 
-export function Navigation() {
+const Navigation = () => {
   const { user } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -119,11 +127,9 @@ export function Navigation() {
   const navItems = [];
 
   return (
-    <>
-      <Nav>
-        <Link href="/" passHref>
-          <NavLink style={{ fontWeight: 'bold' }}>jour-un</NavLink>
-        </Link>
+    <Nav>
+      <NavContainer>
+        <Logo />
 
         <NavItems>
           {navItems.map(({ path, label }) => (
@@ -160,7 +166,7 @@ export function Navigation() {
             {isMenuOpen ? '✕' : '☰'}
           </MenuButton>
         </div>
-      </Nav>
+      </NavContainer>
 
       <AnimatePresence>
         {isMenuOpen && (
@@ -182,6 +188,8 @@ export function Navigation() {
           </MobileMenu>
         )}
       </AnimatePresence>
-    </>
+    </Nav>
   );
-}
+};
+
+export { Navigation };

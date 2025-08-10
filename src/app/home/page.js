@@ -4,7 +4,6 @@ import { useAuth } from '@/context/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import styled from '@emotion/styled';
-import { redirect } from 'next/navigation';
 
 const Dashboard = dynamic(() => import('@/components/Dashboard'), { 
   ssr: false,
@@ -63,5 +62,3 @@ export default function HomePage() {
     </PageContainer>
   );
 }
-
-redirect('/home');
