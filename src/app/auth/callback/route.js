@@ -5,20 +5,20 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
+  try {
+    const requestUrl = new URL(request.url)
+    const code = requestUrl.searchParams.get('code')
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin
 
-  if (code) {
-    const supabase = createRouteHandlerClient({ cookies })
-    try {
+    if (code) {
+      const supabase = createRouteHandlerClient({ cookies })
       await supabase.auth.exchangeCodeForSession(code)
-      // Redirect to the home page after successful authentication
-      return NextResponse.redirect(new URL('/', requestUrl.origin))
-    } catch (error) {
-      console.error('Auth error:', error)
-      return NextResponse.redirect(new URL('/login', requestUrl.origin))
+      return NextResponse.redirect(`${origin}/profile`)
     }
-  }
 
-  return NextResponse.redirect(new URL('/login', requestUrl.origin))
+    return NextResponse.redirect(`${origin}/login`)
+  } catch (error) {
+    console.error('Auth error:', error)
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL || request.url.origin}/login`)
+  }
 }

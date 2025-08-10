@@ -64,18 +64,22 @@ export default function LoginPage() {
     }
   };
   
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignIn = async () => {
     const supabase = createClientComponentClient()
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
         queryParams: {
           access_type: 'offline',
-          prompt: 'consent'
-        },
-        redirectTo: `${window.location.origin}/auth/callback`
+          prompt: 'consent',
+        }
       }
     })
+    
+    if (error) {
+      console.error('Error:', error.message)
+    }
   };
 
   return (
@@ -93,7 +97,7 @@ export default function LoginPage() {
         <Button type="submit">Log In</Button>
       </Form>
       <p>or</p>
-      <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
+      <GoogleButton onClick={handleGoogleSignIn}>Sign in with Google</GoogleButton>
       <p>Don't have an account? <a href="/signup">Sign Up</a></p>
     </Container>
   );
