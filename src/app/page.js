@@ -1,18 +1,16 @@
-'use client'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/context/AuthProvider'
-import dynamic from 'next/dynamic'
-import styled from '@emotion/styled'
-import { Navigation } from '@/components/Navigation'
+'use client';
+import { useEffect } from 'react';
+import { useAuth } from '@/context/AuthProvider';
+import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { Navigation } from '@/components/Navigation';
+import styled from '@emotion/styled';
 
-const Dashboard = dynamic(() => import('@/components/Dashboard'), {
-  ssr: false,
-  loading: () => <div>Loading dashboard...</div>
-})
+// Dynamically import Dashboard to avoid SSR issues
+const Dashboard = dynamic(() => import('@/components/Dashboard'), { ssr: false });
 
 const PageContainer = styled.div`
-  margin-top: 60px;
+  margin-top: 60px; // Height of the navigation bar
   min-height: calc(100vh - 60px);
   padding: 1rem;
   background: ${props => props.theme.background};
@@ -22,22 +20,37 @@ const PageContainer = styled.div`
   }
 `;
 
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100vh - 60px);
+  background: ${props => props.theme.background};
+`;
+
 export default function HomePage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login')
+      router.push('/login');
     }
-  }, [user, loading, router])
+  }, [user, loading, router]);
 
   if (loading) {
-    return <div>Loading...</div>
+    return (
+      <>
+        <Navigation />
+        <LoadingContainer>
+          <div>Loading...</div>
+        </LoadingContainer>
+      </>
+    );
   }
-
+  
   if (!user) {
-    return null
+    return null;
   }
 
   return (
@@ -47,5 +60,5 @@ export default function HomePage() {
         <Dashboard />
       </PageContainer>
     </>
-  )
+  );
 }

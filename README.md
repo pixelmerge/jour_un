@@ -390,4 +390,3 @@ FOR INSERT WITH CHECK (bucket_id = 'food_images' AND auth.uid() IS NOT NULL);
 
 CREATE POLICY "Users can view their own food images" ON storage.objects
 FOR SELECT USING (bucket_id = 'food_images' AND owner = auth.uid());
-````

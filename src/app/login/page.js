@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const Container = styled.div`
   display: flex;
@@ -64,22 +63,13 @@ export default function LoginPage() {
     }
   };
   
-  const handleGoogleSignIn = async () => {
-    const supabase = createClientComponentClient()
-    const { error } = await supabase.auth.signInWithOAuth({
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      }
-    })
-    
-    if (error) {
-      console.error('Error:', error.message)
-    }
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
   };
 
   return (
@@ -97,7 +87,7 @@ export default function LoginPage() {
         <Button type="submit">Log In</Button>
       </Form>
       <p>or</p>
-      <GoogleButton onClick={handleGoogleSignIn}>Sign in with Google</GoogleButton>
+      <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
       <p>Don't have an account? <a href="/signup">Sign Up</a></p>
     </Container>
   );
