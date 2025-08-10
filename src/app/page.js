@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Navigation } from '@/components/Navigation';
 import styled from '@emotion/styled';
+import Link from 'next/link';
+import { useTheme } from '@/context/ThemeProvider';
 
 // Dynamically import Dashboard to avoid SSR issues
 const Dashboard = dynamic(() => import('@/components/Dashboard'), { ssr: false });
@@ -28,9 +30,39 @@ const LoadingContainer = styled.div`
   background: ${props => props.theme.background};
 `;
 
+const Header = styled.header`
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: ${({ theme }) => theme.background.secondary};
+`;
+
+const ThemeToggle = styled.button`
+  padding: 0.5rem;
+  border-radius: 50%;
+  border: none;
+  background: ${({ theme }) => theme.background.hover};
+  color: ${({ theme }) => theme.text.primary};
+  cursor: pointer;
+  transition: all 0.2s;
+`;
+
+const ProfileButton = styled.button`
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  background: none;
+  border: 1px solid ${({ theme }) => theme.border.primary};
+  border-radius: 6px;
+  color: ${({ theme }) => theme.text.primary};
+  cursor: pointer;
+`;
+
 export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -56,6 +88,29 @@ export default function HomePage() {
   return (
     <>
       <Navigation />
+      <Header>
+        <h1>jour-un</h1>
+        
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <ThemeToggle onClick={toggleTheme}>
+            {theme === 'dark' ? '🌙' : '☀️'}
+          </ThemeToggle>
+
+          {user ? (
+            <Link href="/profile">
+              <ProfileButton>
+                <img 
+                  src={user.user_metadata?.avatar_url || '/default-avatar.png'} 
+                  alt="Profile" 
+                  style={{ width: '32px', height: '32px', borderRadius: '50%' }}
+                />
+              </ProfileButton>
+            </Link>
+          ) : (
+            <Link href="/login">Login</Link>
+          )}
+        </div>
+      </Header>
       <PageContainer>
         <Dashboard />
       </PageContainer>
