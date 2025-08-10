@@ -8,16 +8,18 @@ export async function GET(request) {
   try {
     const requestUrl = new URL(request.url)
     const code = requestUrl.searchParams.get('code')
-    const origin = process.env.NEXT_PUBLIC_SITE_URL
+    
     if (code) {
       const supabase = createRouteHandlerClient({ cookies })
       await supabase.auth.exchangeCodeForSession(code)
-      return NextResponse.redirect(`${origin}/profile`)
+      
+      // Redirect to homepage with success parameter
+      return NextResponse.redirect(new URL('/?auth=success', requestUrl.origin))
     }
 
-    return NextResponse.redirect(`${origin}/login`)
+    return NextResponse.redirect(new URL('/login', requestUrl.origin))
   } catch (error) {
     console.error('Auth error:', error)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL }/login`)
+    return NextResponse.redirect(new URL('/login', requestUrl.origin))
   }
 }

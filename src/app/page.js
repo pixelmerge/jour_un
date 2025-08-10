@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthProvider';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Navigation } from '@/components/Navigation';
 import styled from '@emotion/styled';
@@ -10,7 +10,7 @@ import styled from '@emotion/styled';
 const Dashboard = dynamic(() => import('@/components/Dashboard'), { ssr: false });
 
 const PageContainer = styled.div`
-  margin-top: 60px; // Height of the navigation bar
+  margin-top: 60px;
   min-height: calc(100vh - 60px);
   padding: 1rem;
   background: ${props => props.theme.background};
@@ -29,8 +29,16 @@ const LoadingContainer = styled.div`
 `;
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
+  const { user, loading, refreshSession } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Check if redirected from auth callback with success parameter
+    if (searchParams.get('auth') === 'success') {
+      refreshSession();
+    }
+  }, [searchParams, refreshSession]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -48,7 +56,7 @@ export default function HomePage() {
       </>
     );
   }
-  
+
   if (!user) {
     return null;
   }
