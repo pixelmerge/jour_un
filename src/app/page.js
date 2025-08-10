@@ -1,9 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Navigation } from '@/components/Navigation';
 import styled from '@emotion/styled';
 
 const Dashboard = dynamic(() => import('@/components/Dashboard'), { 
@@ -34,33 +33,23 @@ export default function HomePage() {
   const { user, loading, refreshSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   useEffect(() => {
     if (searchParams?.get('auth') === 'success') {
-      refreshSession?.();
+      console.log('Auth success detected, refreshing session...');
+      refreshSession();
     }
   }, [searchParams, refreshSession]);
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log('No user found, redirecting to login...');
       router.push('/login');
     }
   }, [user, loading, router]);
 
-  if (!isClient || loading) {
-    return (
-      <>
-        <Navigation />
-        <LoadingContainer>
-          <div>Loading...</div>
-        </LoadingContainer>
-      </>
-    );
+  if (loading) {
+    return <LoadingContainer>Loading...</LoadingContainer>;
   }
 
   if (!user) {
@@ -68,11 +57,8 @@ export default function HomePage() {
   }
 
   return (
-    <>
-      <Navigation />
-      <PageContainer>
-        <Dashboard />
-      </PageContainer>
-    </>
+    <PageContainer>
+      <Dashboard />
+    </PageContainer>
   );
 }

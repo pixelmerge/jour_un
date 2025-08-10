@@ -11,15 +11,33 @@ export async function GET(request) {
     
     if (code) {
       const supabase = createRouteHandlerClient({ cookies })
-      await supabase.auth.exchangeCodeForSession(code)
+      const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code)
       
-      // Redirect to homepage with success parameter
-      return NextResponse.redirect(new URL('/?auth=success', requestUrl.origin))
+      if (error) {
+        console.error('Code exchange error:', error)
+        throw error
+      }
+
+      if (!session) {
+        console.error('No session after code exchange')
+        throw new Error('No session created')
+      }
+
+      // Set cookie with session
+      const response = NextResponse.redirect(new URL('/?auth=success', requestUrl.origin))
+      
+      // Set a cookie to indicate successful auth
+      response.cookies.set('auth-success', 'true', {
+        maxAge: 30, // 30 seconds
+        path: '/',
+      })
+
+      return response
     }
 
     return NextResponse.redirect(new URL('/login', requestUrl.origin))
   } catch (error) {
-    console.error('Auth error:', error)
-    return NextResponse.redirect(new URL('/login', requestUrl.origin))
+    console.error('Auth callback error:', error)
+    return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent(error.message), requestUrl.origin))
   }
 }
