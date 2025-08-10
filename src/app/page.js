@@ -3,10 +3,11 @@ import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Navigation } from '@/components/Navigation';
 import styled from '@emotion/styled';
 import Link from 'next/link';
 import { useTheme } from '@/context/ThemeProvider';
+import Image from 'next/image';
+import { useState } from 'react';
 
 // Dynamically import Dashboard to avoid SSR issues
 const Dashboard = dynamic(() => import('@/components/Dashboard'), { ssr: false });
@@ -73,7 +74,6 @@ export default function HomePage() {
   if (loading) {
     return (
       <>
-        <Navigation />
         <LoadingContainer>
           <div>Loading...</div>
         </LoadingContainer>
@@ -87,7 +87,6 @@ export default function HomePage() {
 
   return (
     <>
-      <Navigation />
       <Header>
         <h1>jour-un</h1>
         

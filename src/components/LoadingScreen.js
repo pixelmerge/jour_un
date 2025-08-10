@@ -1,7 +1,11 @@
 'use client';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import styled from '@emotion/styled';
+import Link from 'next/link';
+import { useTheme } from '@/context/ThemeProvider';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 

@@ -103,29 +103,6 @@ const StatLabel = styled.div`
   font-weight: 500;
 `;
 
-const TimelineButton = styled(Button)`
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  padding: 0.5rem;
-  min-width: auto;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: ${props => props.theme.background.secondary};
-  opacity: 0.8;
-  transition: opacity 0.2s;
-  z-index: 10; // Ensure button is clickable
-
-  &:hover {
-    opacity: 1;
-    background: ${props => props.theme.background.hover};
-  }
-`;
-
 const LogButton = styled(Button)`
   color: #ffffff; // Always white for contrast
   background: ${({ theme }) => theme.primaryButton.background};
@@ -609,13 +586,6 @@ export default function Dashboard() {
                   </Button>
                 )}
               </div>
-              {/* Add timeline button here */}
-              <TimelineButton
-                onClick={() => setTimelineView(key === 'calories' ? 'food' : key)}
-                title={`View ${key === 'calories' ? 'food' : key} timeline`}
-              >
-                📊
-              </TimelineButton>
               <Button
                 variant="text"
                 size="small"
