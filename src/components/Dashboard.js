@@ -681,13 +681,14 @@ export default function Dashboard() {
         <Modal onClose={() => setActiveLogger(null)}>
           {activeLogger === 'calories' ? (
             <FoodLogger onSuccess={() => {
-              setActiveLogger(null);
+              // Allow the post-save animation to play for ~3 seconds
               fetchStats();
+              setTimeout(() => setActiveLogger(null), 3000);
             }} />
           ) : (
             <ActivityLogger onSuccess={() => {
-              setActiveLogger(null);
               fetchStats();
+              setTimeout(() => setActiveLogger(null), 3000);
             }} />
           )}
         </Modal>
@@ -695,7 +696,7 @@ export default function Dashboard() {
       {activeLogger === 'sleep' && (
         <Modal onClose={() => setActiveLogger(null)}>
           <SleepTracker 
-            onSuccess={() => setActiveLogger(null)}
+            onSuccess={() => { /* keep modal open to let animation finish */ }}
             onUpdate={fetchStats} 
           />
         </Modal>

@@ -7,6 +7,7 @@ import axios from 'axios';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthProvider';
 import { v4 as uuidv4 } from 'uuid';
+import LottieOverlay from './ui/LottieOverlay';
 
 const DropzoneContainer = styled.div`
   border: 2px dashed ${({ theme }) => theme.borderColor};
@@ -215,6 +216,7 @@ const FoodLogger = ({ onSuccess }) => {
   const [userComment, setUserComment] = useState('');
   const [isListening, setIsListening] = useState(false);
   const videoRef = useRef(null);
+  const [showCongrats, setShowCongrats] = useState(false);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
@@ -393,7 +395,11 @@ const FoodLogger = ({ onSuccess }) => {
 
       if (error) throw error;
 
-      resetState();
+  resetState();
+
+  // Show food animation overlay for ~3 seconds
+  setShowCongrats(true);
+  setTimeout(() => setShowCongrats(false), 3000);
 
       if (typeof onSuccess === 'function') {
         onSuccess();
@@ -491,6 +497,13 @@ const FoodLogger = ({ onSuccess }) => {
 
   return (
     <LoggerContainer>
+      <LottieOverlay 
+        show={showCongrats}
+        path="/animations/food.json"
+        durationMs={3000}
+        speed={0.5}
+        onHide={() => setShowCongrats(false)}
+      />
       <h3>Log Your Meal</h3>
       
       <TabContainer>

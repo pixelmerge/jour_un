@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import styled from '@emotion/styled';
+import LottieOverlay from './ui/LottieOverlay';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { differenceInHours } from 'date-fns';
@@ -37,6 +38,7 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
   const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [overlay, setOverlay] = useState({ show: false, segment: null });
   
   const handleSleepStart = async () => {
     try {
@@ -75,8 +77,9 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
 
       if (insertError) throw insertError;
 
-      setSuccess('Sleep start time logged successfully! 😴');
+  setSuccess('Sleep start time logged successfully! 😴');
       setError('');
+  setOverlay({ show: true, segment: [0, 90] });
       if (onUpdate) await onUpdate();
       if (onSuccess) onSuccess();
     } catch (err) {
@@ -140,8 +143,9 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
         throw updateError;
       }
 
-      setSuccess(`Wake up time logged! You slept for ${duration} hours (${quality} quality)`);
+  setSuccess(`Wake up time logged! You slept for ${duration} hours (${quality} quality)`);
       setError('');
+  setOverlay({ show: true, segment: [380, 480] });
       if (onSuccess) onSuccess();
       if (onUpdate) onUpdate(); // Call onUpdate to refresh stats
     } catch (err) {
@@ -153,6 +157,14 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
 
   return (
     <div style={{ padding: '1.5rem' }}>
+      <LottieOverlay 
+        show={overlay.show}
+        path="/animations/sleep and wake.json"
+        initialSegment={overlay.segment || undefined}
+        loop={false}
+        speed={0.5}
+        onHide={() => setOverlay({ show: false, segment: null })}
+      />
       {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
       {success && <p style={{ color: 'green', marginBottom: '1rem' }}>{success}</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

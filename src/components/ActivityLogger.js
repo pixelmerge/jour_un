@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
+import LottieOverlay from './ui/LottieOverlay';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import axios from 'axios';
 import { useAuth } from '@/context/AuthProvider';
@@ -29,6 +30,7 @@ const ActivityLogger = ({ onSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
+  const [showCongrats, setShowCongrats] = useState(false);
 
   useEffect(() => {
     setTextInput(transcript);
@@ -110,8 +112,10 @@ const ActivityLogger = ({ onSuccess }) => {
 
       if (dbError) throw dbError;
 
-      setTextInput('');
+  setTextInput('');
       setAnalysis(null);
+  setShowCongrats(true);
+  setTimeout(() => setShowCongrats(false), 3000);
       if (typeof onSuccess === 'function') {
         onSuccess();
       }
@@ -127,6 +131,13 @@ const ActivityLogger = ({ onSuccess }) => {
 
   return (
     <div>
+      <LottieOverlay 
+        show={showCongrats}
+        path="/animations/run.json"
+        durationMs={3000}
+        speed={0.5}
+        onHide={() => setShowCongrats(false)}
+      />
       <h3>Log Your Activity</h3>
       <textarea 
         value={textInput} 
