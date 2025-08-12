@@ -222,6 +222,8 @@ export default function Dashboard() {
           return startOfDay(now);
       }
     })();
+    const periodStart = startDate;
+    const periodEnd = new Date();
 
     try {
       // Fetch food entries
@@ -239,14 +241,15 @@ export default function Dashboard() {
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
 
-      // Fetch sleep entries (completed only)
+      // Fetch sleep entries (completed only) that END within or after the period start
+      // This captures overnight sessions that started before midnight but ended today.
       const { data: sleepData } = await supabase
         .from('sleep_entries')
-        .select('duration_hours, quality, start_time')
+        .select('start_time, end_time, duration_hours, quality')
         .eq('user_id', user.id)
         .eq('is_complete', true)
-        .gte('start_time', startDate.toISOString())
-        .order('start_time', { ascending: false });
+        .gte('end_time', periodStart.toISOString())
+        .order('end_time', { ascending: false });
 
       // Days in the selected period (1, 7, 30)
       const { days } = periodMeta[selectedPeriod] || { days: 1 };
@@ -258,9 +261,15 @@ export default function Dashboard() {
       const totalActivityMinutes =
         activityData?.reduce((sum, entry) => sum + Number(entry.duration_minutes || 0), 0) || 0;
 
-      // Sleep: sum hours over the period, then average per day (not per entry)
-      const totalSleepHours =
-        sleepData?.reduce((sum, entry) => sum + Number(entry.duration_hours || 0), 0) || 0;
+      // Sleep: sum ONLY the hours overlapping the selected period window
+      const totalSleepHours = (sleepData || []).reduce((sum, entry) => {
+        const s = new Date(entry.start_time);
+        const e = new Date(entry.end_time);
+        const overlapStart = s > periodStart ? s : periodStart;
+        const overlapEnd = e < periodEnd ? e : periodEnd;
+        const ms = Math.max(0, overlapEnd - overlapStart);
+        return sum + ms / (1000 * 60 * 60);
+      }, 0);
       const avgSleepHoursPerDay = days > 0 ? Number((totalSleepHours / days).toFixed(1)) : 0;
       const latestSleepQuality = sleepData?.[0]?.quality || 'N/A';
 
