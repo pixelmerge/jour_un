@@ -74,3 +74,65 @@ Return ONLY a JSON object in this exact format:
     throw new Error(`Failed to analyze activity: ${error.message}`);
   }
 }
+
+export async function generateFoodAnalysisFromText(description) {
+  try {
+    const prompt = `Analyze the following food description and return a structured JSON object with estimated nutritional information. The description is: "${description}".
+
+Return ONLY a JSON object in this exact format:
+{
+  "food_name": "a concise and descriptive name for the meal",
+  "calories": number,
+  "portion_size": "e.g., 1 bowl, 2 slices, 100g",
+  "protein_g": number,
+  "carbs_g": number,
+  "fat_g": number
+}`;
+
+    const result = await geminiModel.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('Error generating food analysis from text:', error);
+    throw new Error('Failed to analyze food description.');
+  }
+}
+
+export async function generateFoodAnalysis(image_data, image_type, user_comment = '') {
+  try {
+    const prompt = [
+      {
+        text: `Analyze the food in this image. ${user_comment ? `The user added this comment: "${user_comment}". Use this comment to improve the analysis.` : ''}
+        Return ONLY a JSON object in this exact format:
+        {
+          "food_name": "name of the food",
+          "calories": number,
+          "portion_size": "e.g., 1 bowl, 2 slices, 100g",
+          "protein_g": number,
+          "carbs_g": number,
+          "fat_g": number
+        }`
+      },
+      {
+        inline_data: {
+          mime_type: image_type,
+          data: image_data.split(',')[1]
+        }
+      }
+    ];
+
+    const result = await geminiModel.generateContent({
+      contents: [{ role: "user", parts: prompt }],
+      ...modelConfig
+    });
+    
+    const response = await result.response;
+    const text = response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+
+  } catch (error) {
+    console.error('Food analysis error:', error);
+    throw new Error(`Failed to analyze food image: ${error.message}`);
+  }
+}

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import styled from '@emotion/styled'; // Fix the import
 import { format } from 'date-fns';
+import { startOfDay, subDays } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient'; // Fix supabase import path
 import { useAuth } from '@/context/AuthProvider';
 
@@ -58,8 +59,8 @@ export default function Timeline({ type, period, onClose }) {
 
       try {
         let query;
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - (period === 'week' ? 7 : 30));
+  const days = period === 'today' ? 1 : period === 'week' ? 7 : 30;
+  const startDate = startOfDay(subDays(new Date(), days));
 
         switch(type) {
           case 'food':

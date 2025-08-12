@@ -47,6 +47,11 @@ export const lightTheme = {
     text: '#ffffff',
     hover: '#1d4ed8'
   },
+  secondaryButton: {
+    background: '#e9ecef',
+    text: '#212529',
+    hover: '#dee2e6'
+  },
   error: '#dc2626',
   success: '#16a34a',
   warning: '#ca8a04'
@@ -79,6 +84,11 @@ export const darkTheme = {
     background: '#3b82f6',
     text: '#ffffff',
     hover: '#2563eb'
+  },
+  secondaryButton: {
+    background: '#374151',
+    text: '#f9fafb',
+    hover: '#4b5563'
   },
   error: '#ef4444',
   success: '#22c55e',

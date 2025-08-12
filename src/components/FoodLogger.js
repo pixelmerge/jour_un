@@ -27,17 +27,19 @@ const Button = styled.button`
   border-radius: 6px;
   border: none;
   background: ${({ theme }) => theme.primary};
-  color: white;
+  color: #000; /* Always black text in both themes */
   cursor: pointer;
   font-weight: 500;
 
   &:disabled {
     opacity: 0.7;
     cursor: not-allowed;
+    color: #000; /* keep text black when disabled */
   }
 
   &:hover:not(:disabled) {
     background: ${({ theme }) => theme.primaryDark};
+    color: #000; /* ensure hover keeps black text */
   }
 `;
 
@@ -88,7 +90,7 @@ const CameraButton = styled(Button)`
     variant === 'danger' 
       ? theme.error 
       : theme.primaryButton.background};
-  color: #ffffff; // Always white for best contrast
+  color: #000; /* Always black text */
   min-width: 120px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -98,12 +100,18 @@ const CameraButton = styled(Button)`
       variant === 'danger' 
         ? theme.error 
         : theme.primaryButton.hover};
+    color: #000; /* ensure hover keeps black text */
   }
 `;
 
 const LoggerContainer = styled.div`
   max-width: 600px;
   margin: 0 auto;
+  overflow: hidden !important;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none !important;
+  }
 `;
 
 const TabContainer = styled.div`
@@ -113,6 +121,9 @@ const TabContainer = styled.div`
   background: ${({ theme }) => theme.background.secondary};
   padding: 0.5rem;
   border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap; /* allow wrapping to avoid horizontal scroll */
 `;
 
 const TabButton = styled.button`
@@ -122,10 +133,13 @@ const TabButton = styled.button`
   background: ${({ isActive, theme }) => 
     isActive ? theme.primaryButton.background : 'transparent'};
   color: ${({ isActive, theme }) => 
-    isActive ? '#ffffff' : theme.text.primary}; // Improved contrast
+    isActive 
+      ? '#000' /* black text when active */
+      : theme.text.primary};
   cursor: pointer;
   font-weight: ${({ isActive }) => isActive ? '600' : '500'};
-  flex: 1;
+  flex: 1 1 32%; /* grow/shrink and wrap across lines */
+  min-width: 120px; /* prevent too small tabs */
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -139,8 +153,7 @@ const TabButton = styled.button`
       isActive 
         ? theme.primaryButton.hover 
         : theme.background.hover};
-    color: ${({ isActive, theme }) => 
-      isActive ? '#ffffff' : theme.text.primary};
+    color: #000; /* keep black on hover for consistency */
   }
 `;
 
@@ -168,6 +181,26 @@ const StyledInput = styled.input`
   }
 `;
 
+const TextArea = styled.textarea`
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid ${({ theme }) => theme.border.primary};
+  background: ${({ theme }) => theme.background.primary};
+  color: ${({ theme }) => theme.text.primary};
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 80px;
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.primary};
+  }
+
+  &::placeholder {
+    color: ${({ theme }) => theme.text.secondary};
+  }
+`;
+
 const FoodLogger = ({ onSuccess }) => {
   const { user } = useAuth();
   const [file, setFile] = useState(null);
@@ -177,8 +210,49 @@ const FoodLogger = ({ onSuccess }) => {
   const [error, setError] = useState('');
   const [stream, setStream] = useState(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [activeTab, setActiveTab] = useState('camera'); // Changed from 'manual'
+  const [activeTab, setActiveTab] = useState('camera');
+  const [foodDescription, setFoodDescription] = useState('');
+  const [userComment, setUserComment] = useState('');
+  const [isListening, setIsListening] = useState(false);
   const videoRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new window.webkitSpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setFoodDescription(transcript);
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setError('Speech recognition failed. Please try again.');
+        setIsListening(false);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const handleMicClick = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current?.start();
+      setIsListening(true);
+    }
+  };
 
   const onDrop = useCallback(async (acceptedFiles) => {
     const imageFile = acceptedFiles[0];
@@ -199,7 +273,6 @@ const FoodLogger = ({ onSuccess }) => {
       const compressedFile = await imageCompression(imageFile, options);
       setFile(compressedFile);
 
-      // Convert file to base64 to send to the new API route
       const reader = new FileReader();
       reader.readAsDataURL(compressedFile);
       reader.onloadend = async () => {
@@ -209,6 +282,7 @@ const FoodLogger = ({ onSuccess }) => {
           const response = await axios.post('/api/food-analyzer', {
             image_data: base64data,
             image_type: compressedFile.type,
+            user_comment: userComment,
           });
 
           if (response.data.success && response.data.analysis) {
@@ -243,13 +317,54 @@ const FoodLogger = ({ onSuccess }) => {
       setError('Failed to compress image. Please try a different one.');
       setLoading(false);
     }
-  }, []);
+  }, [userComment]);
   
   const resetState = () => {
     setFile(null);
     setPreview(null);
     setAnalysis(null);
     setError('');
+    setFoodDescription('');
+    setUserComment('');
+  };
+
+  const handleAnalyzeText = async () => {
+    if (!foodDescription.trim()) {
+      setError('Please enter a food description.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setAnalysis(null);
+
+    try {
+      const response = await axios.post('/api/food-text-analyzer', {
+        description: foodDescription,
+      });
+
+      if (response.data.success && response.data.analysis) {
+        const { analysis: resAnalysis } = response.data;
+        const analysisData = {
+          foodName: resAnalysis.food_name,
+          calories: resAnalysis.calories,
+          portionSize: resAnalysis.portion_size,
+          nutrition: {
+            protein: `${resAnalysis.protein_g || 0}g`,
+            carbs: `${resAnalysis.carbs_g || 0}g`,
+            fat: `${resAnalysis.fat_g || 0}g`
+          }
+        };
+        setAnalysis(analysisData);
+      } else {
+        throw new Error(response.data.error || 'Failed to analyze description');
+      }
+    } catch (err) {
+      console.error('Text Analysis Error:', err);
+      setError(err.response?.data?.error || err.message || 'Failed to analyze description. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -258,14 +373,13 @@ const FoodLogger = ({ onSuccess }) => {
         throw new Error('No analysis data available');
       }
 
-      // Safely parse calories to prevent database errors
       const caloriesInt = Math.round(parseFloat(analysis.calories)) || 0;
 
       const entry = {
         food_name: analysis.foodName,
         calories: caloriesInt,
         portion_size: analysis.portionSize,
-        notes: '',
+        notes: userComment || '',
         image_url: preview || null,
         user_id: user.id,
         created_at: new Date().toISOString()
@@ -279,13 +393,8 @@ const FoodLogger = ({ onSuccess }) => {
 
       if (error) throw error;
 
-      // Reset form state
-      setPreview(null);
-      setAnalysis(null);
-      setFile(null);
-      setError('');
+      resetState();
 
-      // Call onSuccess only if it exists
       if (typeof onSuccess === 'function') {
         onSuccess();
       }
@@ -297,12 +406,10 @@ const FoodLogger = ({ onSuccess }) => {
 
   const startCamera = async () => {
     try {
-      // First check if camera is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera not supported on this device/browser');
       }
 
-      // Try environment camera first (back camera)
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { 
@@ -311,7 +418,6 @@ const FoodLogger = ({ onSuccess }) => {
         });
         setStream(mediaStream);
       } catch (backCameraError) {
-        // If back camera fails, try any available camera
         console.log('Back camera not available, trying front camera');
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: true
@@ -323,7 +429,6 @@ const FoodLogger = ({ onSuccess }) => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Ensure video is playing
         await videoRef.current.play();
       }
     } catch (err) {
@@ -334,6 +439,9 @@ const FoodLogger = ({ onSuccess }) => {
   };
 
   const stopCamera = () => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
@@ -358,16 +466,17 @@ const FoodLogger = ({ onSuccess }) => {
     }, 'image/jpeg');
   };
 
-  // Add cleanup for camera on unmount
   useEffect(() => {
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
   }, [stream]);
 
-  // Add this effect after your other useEffect
   useEffect(() => {
     if (stream && videoRef.current) {
       videoRef.current.srcObject = stream;
@@ -386,6 +495,13 @@ const FoodLogger = ({ onSuccess }) => {
       
       <TabContainer>
         <TabButton 
+          isActive={activeTab === 'text'} 
+          onClick={() => setActiveTab('text')}
+        >
+          <span role="img" aria-label="text">✍️</span>
+          Analyze Text
+        </TabButton>
+        <TabButton 
           isActive={activeTab === 'camera'} 
           onClick={() => setActiveTab('camera')}
         >
@@ -399,60 +515,35 @@ const FoodLogger = ({ onSuccess }) => {
           <span role="img" aria-label="upload">📤</span>
           Upload Photo
         </TabButton>
-        <TabButton 
-          isActive={activeTab === 'manual'} 
-          onClick={() => setActiveTab('manual')}
-        >
-          <span role="img" aria-label="manual">✍️</span>
-          Manual Entry
-        </TabButton>
       </TabContainer>
 
-      {activeTab === 'manual' && (
-        <div style={{ marginBottom: '1rem' }}>
-          <h4>Option 1: Manual Entry</h4>
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            
-            try {
-              const entry = {
-                food_name: formData.get('foodName'),
-                calories: parseInt(formData.get('calories')),
-                portion_size: formData.get('portionSize'),
-                user_id: user.id,
-                created_at: new Date().toISOString()
-              };
-
-              const { error } = await supabase
-                .from('food_entries')
-                .insert([entry]);
-
-              if (error) throw error;
-
-              if (typeof onSuccess === 'function') {
-                onSuccess();
-              }
-            } catch (err) {
-              setError('Failed to save food entry. Please try again.');
-            }
-          }}>
-            <div style={{ display: 'grid', gap: '1rem', marginBottom: '1rem' }}>
-              <StyledInput name="foodName" placeholder="Food Name" required />
-              <StyledInput name="calories" type="number" placeholder="Calories" required />
-              <StyledInput name="portionSize" placeholder="Portion Size" required />
-              <StyledInput name="protein" placeholder="Protein (g)" />
-              <StyledInput name="carbs" placeholder="Carbs (g)" />
-              <StyledInput name="fat" placeholder="Fat (g)" />
+      {activeTab === 'text' && (
+        <div>
+          <h4>Analyze Food by Description</h4>
+          <InputGroup>
+            <TextArea
+              placeholder="e.g., 'A bowl of oatmeal with blueberries and a drizzle of honey' or '2 slices of pepperoni pizza'"
+              value={foodDescription}
+              onChange={(e) => setFoodDescription(e.target.value)}
+              rows="4"
+            />
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button onClick={handleAnalyzeText} disabled={loading}>
+                {loading ? 'Analyzing...' : 'Analyze Description'}
+              </Button>
+              {recognitionRef.current && (
+                <Button onClick={handleMicClick} disabled={loading}>
+                  {isListening ? 'Listening...' : '🎤 Speak'}
+                </Button>
+              )}
             </div>
-            <Button type="submit">Save Manual Entry</Button>
-          </form>
+          </InputGroup>
         </div>
       )}
 
       {activeTab === 'upload' && (
         <>
-          <h4>Option 2: Upload Photo</h4>
+          <h4>Upload a Photo</h4>
           <DropzoneContainer {...getRootProps()}>
             <input {...getInputProps()} />
             {loading ? (
@@ -522,19 +613,34 @@ const FoodLogger = ({ onSuccess }) => {
       {preview && (
         <div style={{ 
           margin: '1rem 0',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          maxWidth: '300px'
         }}>
-          <img 
-            src={preview} 
-            alt="Food preview" 
-            style={{ 
-              width: '100%',
-              height: 'auto',
-              display: 'block'
-            }} 
-          />
+          <div style={{
+            borderRadius: '8px',
+            overflow: 'hidden',
+            maxWidth: '300px',
+            marginBottom: '1rem'
+          }}>
+            <img 
+              src={preview} 
+              alt="Food preview" 
+              style={{ 
+                width: '100%',
+                height: 'auto',
+                display: 'block'
+              }} 
+            />
+          </div>
+          <InputGroup>
+            <TextArea
+              placeholder="Add a comment to improve analysis (e.g., 'This was a large portion' or 'Dressing is light vinaigrette')"
+              value={userComment}
+              onChange={(e) => setUserComment(e.target.value)}
+              rows="2"
+            />
+            <Button onClick={() => onDrop([file])} disabled={loading}>
+              {loading ? 'Re-analyzing...' : 'Re-analyze with Comment'}
+            </Button>
+          </InputGroup>
         </div>
       )}
 

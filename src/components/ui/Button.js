@@ -11,13 +11,15 @@ export const Button = styled(motion.button)`
   background: ${({ variant, theme }) => 
     variant === 'secondary' 
       ? theme.secondaryButton?.background 
-      : theme.primaryButton.background};
+      : variant === 'text'
+        ? 'transparent'
+        : theme.primaryButton.background};
   color: ${({ variant, theme }) => 
     variant === 'secondary' 
-      ? theme.mode === 'dark' 
-        ? '#ffffff' 
-        : theme.text.primary
-      : '#ffffff'};
+      ? theme.secondaryButton?.text || theme.text.primary
+      : variant === 'text'
+        ? theme.text.accent
+        : '#ffffff'};
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 
   &:hover {
@@ -25,7 +27,9 @@ export const Button = styled(motion.button)`
     background: ${({ variant, theme }) => 
       variant === 'secondary' 
         ? theme.secondaryButton?.hover 
-        : theme.primaryButton.hover};
+        : variant === 'text'
+          ? 'transparent'
+          : theme.primaryButton.hover};
   }
 
   &:disabled {

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabaseClient';
+import Image from 'next/image';
 
 const Form = styled.form`
   display: flex;
@@ -54,6 +55,18 @@ const Button = styled.button`
   }
 `;
 
+const SectionTitle = styled.h2`
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+  color: ${({ theme }) => theme.text.primary};
+`;
+
+const AvatarWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
 const ErrorMessage = styled.div`
   color: ${({ theme }) => theme.error};
   font-size: 0.875rem;
@@ -82,6 +95,7 @@ export function UserProfile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -169,6 +183,34 @@ export function UserProfile() {
     }
   };
 
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setAvatarUploading(true);
+      const fileName = `${user.id}-${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('food_images')
+        .upload(`avatars/${fileName}`, file, { upsert: false, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage
+        .from('food_images')
+        .getPublicUrl(`avatars/${fileName}`);
+      // Save to profiles
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      if (profileError) throw profileError;
+      setSuccess('Profile photo updated');
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      setError('Failed to update profile photo');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   if (!user) return <div>Please sign in to view your profile.</div>;
   if (loading) return <div>Loading profile...</div>;
 
@@ -178,6 +220,22 @@ export function UserProfile() {
       {success && <SuccessMessage>{success}</SuccessMessage>}
 
       <FormSection>
+        <SectionTitle>Profile</SectionTitle>
+        <AvatarWrapper>
+          <Image
+            src={(user.user_metadata?.avatar_url && user.user_metadata.avatar_url.startsWith('http'))
+              ? user.user_metadata.avatar_url
+              : '/icons/icon-192x192.png'}
+            alt="Avatar"
+            width={56}
+            height={56}
+            style={{ borderRadius: '50%', objectFit: 'cover' }}
+          />
+          <div>
+            <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={avatarUploading} />
+            {avatarUploading && <div style={{ fontSize: '0.875rem' }}>Uploading…</div>}
+          </div>
+        </AvatarWrapper>
         <Label>Full Name</Label>
         <Input
           type="text"
@@ -188,7 +246,7 @@ export function UserProfile() {
       </FormSection>
 
       <FormSection>
-        <Label>Physical Characteristics</Label>
+        <SectionTitle>Physical Characteristics</SectionTitle>
         <Input
           type="number"
           value={profile.weight_kg}
@@ -238,7 +296,7 @@ export function UserProfile() {
       </FormSection>
 
       <FormSection>
-        <Label>Goals</Label>
+        <SectionTitle>Goals</SectionTitle>
         <Input
           type="text"
           value={profile.nutrition_goal}

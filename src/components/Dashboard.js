@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import styled from '@emotion/styled';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from './ui/Card';
@@ -12,28 +12,90 @@ import ActivityLogger from './ActivityLogger';
 import Modal from './ui/Modal';
 import Timeline from './ui/Timeline';
 
+// Lightweight confetti burst using CSS circles (no new deps)
+const Confetti = ({ trigger }) => (
+  <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+    {[...Array(10)].map((_, i) => (
+      <span
+        key={i}
+        style={{
+          position: 'absolute',
+          left: `${10 + i * 8}%`,
+          top: trigger ? '10%' : '-20%',
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: ['#4CAF50','#FF7043','#7E57C2','#42A5F5','#FFC107'][i%5],
+          transition: 'top 600ms ease, opacity 600ms ease',
+          opacity: trigger ? 1 : 0
+        }}
+      />
+    ))}
+  </div>
+);
+
 const DashboardContainer = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-  padding: 1rem;
-  max-width: 1400px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0.75rem;
+  padding: 0.5rem 0 0.25rem;
   margin: 0 auto;
 
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); // Increased from 280px
+  /* Mobile: horizontal swipe */
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(0,0,0,0.25) transparent;
+
+  &::-webkit-scrollbar { height: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(0,0,0,0.25), rgba(0,0,0,0.15));
+    border-radius: 999px;
+  }
+  &:hover::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0.2));
+  }
+
+  /* Wide: show all three fully, no scroll */
+  @media (min-width: 900px) {
+    max-width: 900px;
+    overflow-x: visible;
+    scroll-snap-type: none;
+    justify-content: space-between;
   }
 `;
 
 const Header = styled.header`
   background: ${props => props.theme.background.secondary};
-  padding: 1.5rem;
-  margin-bottom: 2rem;
+  padding: 0.5rem 1rem; /* reduced to sit closer to nav */
+  margin-bottom: 0.75rem; /* tighter spacing */
   border-bottom: 1px solid ${props => props.theme.border.primary};
   display: flex;
   justify-content: center;
   align-items: center;
   border-radius: 8px;
+`;
+
+// Layout inside header: segment control on the left, refresh on the right
+const HeaderRow = styled.div`
+  display: flex;
+  width: 100%;
+  max-width: 900px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+`;
+
+const SegmentWrapper = styled.div`
+  display: flex;
+  gap: 0.25rem;
+  background: ${props => props.theme.background.hover};
+  padding: 0.25rem;
+  border-radius: 10px;
 `;
 
 const PeriodButton = styled.button`
@@ -74,8 +136,20 @@ const StatCard = styled(Card)`
   background: ${props => props.theme.card.background};
   border: 1px solid ${props => props.theme.card.border};
   transition: transform 0.2s, box-shadow 0.2s;
-  padding: 1.25rem;
-  min-height: 320px; // Increased from 280px
+  padding: 1rem;
+  /* remove large fixed min-height to prevent big blank areas */
+  scroll-snap-align: start;
+
+  /* Mobile card width: responsive clamp */
+  flex: 0 0 auto;
+  width: clamp(260px, 80vw, 320px);
+
+  /* Wide: three equal columns with no overflow */
+  @media (min-width: 900px) {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+  }
 
   &:hover {
     transform: translateY(-2px);
@@ -103,6 +177,15 @@ const StatLabel = styled.div`
   font-weight: 500;
 `;
 
+const DetailText = styled.div`
+  color: ${props => props.theme.text.secondary};
+`;
+
+const RingLabel = styled.div`
+  font-size: 12px;
+  color: ${props => props.theme.text.secondary};
+`;
+
 const LogButton = styled(Button)`
   color: #ffffff; // Always white for contrast
   background: ${({ theme }) => theme.primaryButton.background};
@@ -111,6 +194,8 @@ const LogButton = styled(Button)`
     background: ${({ theme }) => theme.primaryButton.hover};
   }
 `;
+
+// Refresh button removed per request
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -122,9 +207,24 @@ export default function Dashboard() {
     sleep: { hours: 0, quality: 'N/A' },
     activity: { minutes: 0, type: 'None' }
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [streak, setStreak] = useState(0);
+  const [motivation, setMotivation] = useState(null);
+  const [celebrate, setCelebrate] = useState(false);
+
+  // Period metadata used across UI and calculations
+  const periodMeta = useMemo(() => ({
+    today: { days: 1, label: 'Today' },
+    week: { days: 7, label: 'Last 7 days' },
+    month: { days: 30, label: 'Last 30 days' }
+  }), []);
 
   const fetchStats = async () => {
     if (!user) return;
+
+    setLoading(true);
+    setError(null);
 
     const startDate = (() => {
       const now = new Date();
@@ -132,9 +232,9 @@ export default function Dashboard() {
         case 'today':
           return startOfDay(now);
         case 'week':
-          return subWeeks(now, 1);
+          return startOfDay(subDays(now, 7));
         case 'month':
-          return subMonths(now, 1);
+          return startOfDay(subDays(now, 30));
         default:
           return startOfDay(now);
       }
@@ -148,42 +248,126 @@ export default function Dashboard() {
         .eq('user_id', user.id)
         .gte('created_at', startDate.toISOString());
 
-      // Fetch activity entries
+      // Fetch activity entries (sorted for recent type)
       const { data: activityData } = await supabase
         .from('activity_entries')
-        .select('calories_burned, duration_minutes, activity_type')
+        .select('calories_burned, duration_minutes, activity_type, created_at')
         .eq('user_id', user.id)
-        .gte('created_at', startDate.toISOString());
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
 
-      // Fetch sleep entries
+      // Fetch sleep entries (completed only)
       const { data: sleepData } = await supabase
         .from('sleep_entries')
-        .select('duration_hours, quality')
+        .select('duration_hours, quality, start_time')
         .eq('user_id', user.id)
         .eq('is_complete', true)
         .gte('start_time', startDate.toISOString())
-        .order('start_time', { ascending: false })
-        .limit(1);
+        .order('start_time', { ascending: false });
 
-      const totalCaloriesConsumed = foodData?.reduce((sum, entry) => sum + entry.calories, 0) || 0;
-      const totalCaloriesBurned = activityData?.reduce((sum, entry) => sum + entry.calories_burned, 0) || 0;
-      const totalActivityMinutes = activityData?.reduce((sum, entry) => sum + entry.duration_minutes, 0) || 0;
-      const lastSleepHours = sleepData?.[0]?.duration_hours || 0;
-      const lastSleepQuality = sleepData?.[0]?.quality || 'N/A';
+      // Days in the selected period (1, 7, 30)
+      const { days } = periodMeta[selectedPeriod] || { days: 1 };
+
+      const totalCaloriesConsumed =
+        foodData?.reduce((sum, entry) => sum + Number(entry.calories || 0), 0) || 0;
+      const totalCaloriesBurned =
+        activityData?.reduce((sum, entry) => sum + Number(entry.calories_burned || 0), 0) || 0;
+      const totalActivityMinutes =
+        activityData?.reduce((sum, entry) => sum + Number(entry.duration_minutes || 0), 0) || 0;
+
+      // Sleep: sum hours over the period, then average per day (not per entry)
+      const totalSleepHours =
+        sleepData?.reduce((sum, entry) => sum + Number(entry.duration_hours || 0), 0) || 0;
+      const avgSleepHoursPerDay = days > 0 ? Number((totalSleepHours / days).toFixed(1)) : 0;
+      const latestSleepQuality = sleepData?.[0]?.quality || 'N/A';
+
+      // Compute period-based targets
+      const caloriesPerDayTarget = 2000; // TODO: user-specific
+      const periodCalorieTarget = caloriesPerDayTarget * days;
 
       setStats({
-        calories: { consumed: totalCaloriesConsumed, burned: totalCaloriesBurned, target: 2000 },
-        sleep: { hours: lastSleepHours, quality: lastSleepQuality },
+        calories: { consumed: totalCaloriesConsumed, burned: totalCaloriesBurned, target: periodCalorieTarget },
+        sleep: { hours: avgSleepHoursPerDay, quality: latestSleepQuality },
         activity: { minutes: totalActivityMinutes, type: activityData?.[0]?.activity_type || 'None' }
       });
+
+      // Compute simple streak: consecutive days with at least one log in any category
+      try {
+        const todayStart = startOfDay(new Date()).toISOString();
+        const { data: recentFood } = await supabase
+          .from('food_entries')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .gte('created_at', subDays(new Date(), 30).toISOString())
+          .order('created_at', { ascending: false });
+        const { data: recentAct } = await supabase
+          .from('activity_entries')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .gte('created_at', subDays(new Date(), 30).toISOString());
+        const { data: recentSleep } = await supabase
+          .from('sleep_entries')
+          .select('start_time')
+          .eq('user_id', user.id)
+          .gte('start_time', subDays(new Date(), 30).toISOString());
+
+        const dates = new Set([
+          ...(recentFood||[]).map(r => new Date(r.created_at).toDateString()),
+          ...(recentAct||[]).map(r => new Date(r.created_at).toDateString()),
+          ...(recentSleep||[]).map(r => new Date(r.start_time).toDateString()),
+        ]);
+
+        let s = 0;
+        for (let i = 0; i < 30; i++) {
+          const d = subDays(new Date(), i).toDateString();
+          if (dates.has(d)) s++; else break;
+        }
+        setStreak(s);
+      } catch (e) {
+        // Non-blocking
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchStats();
+    
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(fetchStats, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [user, selectedPeriod]);
+
+  // Pull motivational insight when stats change
+  useEffect(() => {
+    const run = async () => {
+      if (!user) return;
+      // throttle: only call once every 60s
+      const now = Date.now();
+      if (!window.__motivation_last__ || now - window.__motivation_last__ > 60000) {
+        try {
+          const res = await fetch('/api/motivation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stats, streak, periodLabel: (periodMeta[selectedPeriod]||{}).label })
+          });
+          const data = await res.json();
+          setMotivation(data);
+          window.__motivation_last__ = now;
+        } catch {}
+      }
+      // Trigger a small celebration if any goal hits >= 100% for today
+      if (selectedPeriod === 'today' && ((stats.activity.minutes >= 30) || (stats.calories.consumed >= stats.calories.target) || (Number(stats.sleep.hours) >= 8))) {
+        setCelebrate(true);
+        setTimeout(() => setCelebrate(false), 900);
+      }
+    };
+    run();
+  }, [user, stats.calories.consumed, stats.calories.burned, stats.activity.minutes, stats.sleep.hours, selectedPeriod]);
 
   // Pass fetchStats to the sleep buttons
   const handleSleepStart = async () => {
@@ -218,128 +402,121 @@ export default function Dashboard() {
     }
   };
 
+  const { days, label: periodLabel } = periodMeta[selectedPeriod] || { days: 1, label: 'Today' };
+
   return (
     <div>
       <Header>
-        <div style={{ 
-          display: 'flex', 
-          gap: '0.25rem',
-          background: props => props.theme.background.hover,
-          padding: '0.25rem',
-          borderRadius: '10px',
-          width: '100%',
-          maxWidth: '360px'
-        }}>
-          {[
-            { value: 'today', label: 'Today', icon: '📅' },
-            { value: 'week', label: 'Week', icon: '📊' },
-            { value: 'month', label: 'Month', icon: '📈' }
-          ].map(period => (
-            <PeriodButton
-              key={period.value}
-              onClick={() => setSelectedPeriod(period.value)}
-              isSelected={selectedPeriod === period.value}
-            >
-              <span role="img" aria-label={period.label}>{period.icon}</span>
-              {period.label}
-            </PeriodButton>
-          ))}
-        </div>
+        <HeaderRow>
+          <SegmentWrapper>
+            {[
+              { value: 'today', label: 'Today', icon: '📅' },
+              { value: 'week', label: 'Week', icon: '📊' },
+              { value: 'month', label: 'Month', icon: '📈' }
+            ].map(period => (
+              <PeriodButton
+                key={period.value}
+                onClick={() => setSelectedPeriod(period.value)}
+                isSelected={selectedPeriod === period.value}
+              >
+                <span role="img" aria-label={period.label}>{period.icon}</span>
+                {period.label}
+              </PeriodButton>
+            ))}
+          </SegmentWrapper>
+
+          {/* Refresh button removed */}
+        </HeaderRow>
+        {error && (
+          <div style={{
+            color: '#ff6b6b',
+            fontSize: '0.875rem',
+            marginTop: '0.75rem',
+            textAlign: 'center'
+          }}>
+            {error}
+          </div>
+        )}
       </Header>
+
+      {/* Hero progress card */}
+      <div style={{ maxWidth: 900, margin: '0 auto 1rem', position: 'relative' }}>
+        <Card as={motion.div} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '1rem 1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ fontSize: 24 }}>🔥</div>
+              <div>
+                <div style={{ fontSize: 14, color: 'inherit', opacity: 0.8 }}>{periodMeta[selectedPeriod]?.label || 'Today'}</div>
+                <div style={{ fontWeight: 700 }}>Streak: {streak} day{streak===1?'':'s'}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1, justifyContent: 'center' }}>
+              {/* compact rings */}
+              {['Calories','Sleep','Activity'].map((t, i) => {
+                const days = (periodMeta[selectedPeriod] || { days: 1 }).days;
+                const perDayActivity =
+                  selectedPeriod === 'today'
+                    ? Number(stats.activity.minutes || 0)
+                    : Number(stats.activity.minutes || 0) / Math.max(1, days);
+                // Sleep.hours is already per-day average from fetchStats
+                const perDaySleep = Number(stats.sleep.hours || 0);
+                const pct = {
+                  Calories: Math.min(100, Math.round((Number(stats.calories.consumed || 0) / Math.max(1, Number(stats.calories.target || 0))) * 100)),
+                  Sleep: Math.min(100, Math.round((perDaySleep / 8) * 100)),
+                  Activity: Math.min(100, Math.round((perDayActivity / 30) * 100)),
+                }[t];
+                const circumference = 2 * Math.PI * 18;
+                return (
+                  <div key={t} style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <svg width="48" height="48" viewBox="0 0 48 48">
+                      <circle cx="24" cy="24" r="18" stroke="#eee" strokeWidth="6" fill="none" />
+                      <circle
+                        cx="24" cy="24" r="18"
+                        stroke={['#4CAF50','#7E57C2','#FF7043'][i]}
+                        strokeWidth="6" fill="none"
+                        strokeDasharray={`${(pct/100)*circumference} ${circumference}`}
+                        transform="rotate(-90 24 24)"
+                        style={{ transition: 'stroke-dasharray 300ms' }}
+                      />
+                      <text x="24" y="27" fontSize="10" textAnchor="middle" fill="currentColor">{pct}%</text>
+                    </svg>
+                    <RingLabel>{t}</RingLabel>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ minWidth: 220, flex: 1 }}>
+              <div style={{ fontSize: 14 }}>{motivation?.emoji || '✨'} {motivation?.message || 'Welcome back—let’s make today count.'}</div>
+            </div>
+          </div>
+          <Confetti trigger={celebrate} />
+        </Card>
+      </div>
 
       <DashboardContainer>
         <AnimatePresence mode="popLayout">
           {[
             {
               key: 'calories',
-              label: 'Calories Today',
-              value: stats.calories.consumed - stats.calories.burned,
-              detail: `${stats.calories.consumed} consumed - ${stats.calories.burned} burned`,
-              chart: true,
+              label: `Calories • ${periodLabel}`,
+              value: Math.max(0, stats.calories.target - stats.calories.consumed),
+              detail: `${stats.calories.consumed} consumed • ${Math.max(0, stats.calories.target - stats.calories.consumed)} remaining • target ${stats.calories.target}`,
               action: '🍽️ Log Meal',
               delay: 0
             },
             {
               key: 'sleep',
-              label: 'Sleep',
+              label: `Sleep • ${selectedPeriod === 'today' ? 'Today' : 'Avg per day'}`,
               value: `${stats.sleep.hours}hrs`,
               detail: `Quality: ${stats.sleep.quality}`,
-              chart: (
-                <Chart>
-                  <svg width="100%" height="100" viewBox="0 0 100 80" preserveAspectRatio="none">
-                    {/* Sleep quality representation */}
-                    <rect x="10" y="40" width="80" height="20" fill="#f0f0f0" rx="4" />
-                    <rect
-                      x="10"
-                      y="40"
-                      width={stats.sleep.hours >= 8 ? 80 : (stats.sleep.hours / 8) * 80}
-                      height="20"
-                      fill="#7E57C2"
-                      rx="4"
-                    />
-                    <text
-                      x="50"
-                      y="35"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      fontSize="10"
-                    >
-                      Target: 8hrs
-                    </text>
-                  </svg>
-                </Chart>
-              ),
               action: '😴 Log Sleep',
               delay: 0.1
             },
             {
               key: 'activity',
-              label: 'Activity',
-              value: `${stats.activity.minutes}min`,
-              detail: `Type: ${stats.activity.type}`,
-              chart: (
-                <Chart>
-                  <svg width="100%" height="120" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    {/* Activity bar chart */}
-                    <rect x="20" y="20" width="15" height="60" fill="#f0f0f0" rx="4" />
-                    <rect
-                      x="20"
-                      y={80 - (stats.activity.minutes / 60) * 60}
-                      width="15"
-                      height={(stats.activity.minutes / 60) * 60}
-                      fill="#FF7043"
-                      rx="4"
-                    />
-                    <text
-                      x="27.5"
-                      y="90"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      fontSize="10"
-                    >
-                      Today
-                    </text>
-                    {/* Target line */}
-                    <line
-                      x1="10"
-                      y1="50"
-                      x2="90"
-                      y2="50"
-                      stroke="#666"
-                      strokeDasharray="2,2"
-                    />
-                    <text
-                      x="95"
-                      y="53"
-                      textAnchor="end"
-                      fill="currentColor"
-                      fontSize="8"
-                    >
-                      30min
-                    </text>
-                  </svg>
-                </Chart>
-              ),
+              label: `Activity • ${selectedPeriod === 'today' ? 'Today' : 'Avg per day'}`,
+              value: `${selectedPeriod === 'today' ? stats.activity.minutes : Math.round(stats.activity.minutes / days)}min${selectedPeriod === 'today' ? '' : '/day'}`,
+              detail: `${selectedPeriod === 'today' ? 'Type' : 'Recent'}: ${stats.activity.type} • ${stats.calories.burned} cal burned`,
               action: '🏃‍♂️ Log Activity',
               delay: 0.2
             }
@@ -355,116 +532,9 @@ export default function Dashboard() {
             >
               <StatLabel>{label}</StatLabel>
               <StatValue>{value}</StatValue>
-              <div style={{ color: 'gray' }}>{detail}</div>
-              {key === 'calories' && (
-                <div style={{ margin: '0.5rem 0' }}>
-                  <svg width="100%" height="160" viewBox="0 0 100 100"> {/* Increased height */}
-                    <circle
-                      cx="50"
-                      cy="50" // Adjusted center point
-                      r="40"   // Increased radius
-                      fill="none"
-                      stroke="#f0f0f0"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke="#4CAF50"
-                      strokeWidth="8"
-                      strokeDasharray={`${(stats.calories.consumed / stats.calories.target) * 251.2} 251.2`}
-                      transform="rotate(-90 50 50)"
-                      style={{ transition: 'stroke-dasharray 0.3s ease' }}
-                    />
-                    <text
-                      x="50"
-                      y="45"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      fontSize="10"
-                      fontWeight="bold"
-                    >
-                      {Math.round((stats.calories.consumed / stats.calories.target) * 100)}%
-                    </text>
-                    <text
-                      x="50"
-                      y="60"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      fontSize="8"
-                    >
-                      of {stats.calories.target} target
-                    </text>
-                  </svg>
-                </div>
-              )}
-              {key === 'sleep' && (
-                <div style={{ margin: '0.5rem 0' }}>
-                  <svg width="100%" height="140" viewBox="0 0 100 100"> {/* Increased height and adjusted viewBox */}
-                    <rect x="10" y="30" width="80" height="30" fill="#f0f0f0" rx="4" />
-                    <rect
-                      x="10"
-                      y="30"
-                      width={stats.sleep.hours >= 8 ? 80 : (stats.sleep.hours / 8) * 80}
-                      height="30"
-                      fill="#7E57C2"
-                      rx="4"
-                    />
-                    <text
-                      x="50"
-                      y="75"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      fontSize="8"
-                    >
-                      {stats.sleep.hours} of 8 hours recommended
-                    </text>
-                  </svg>
-                </div>
-              )}
-              {key === 'activity' && (
-                <div style={{ margin: '0.5rem 0' }}>
-                  <svg width="100%" height="160" viewBox="0 0 100 120"> {/* Increased height and adjusted viewBox */}
-                    <defs>
-                      <linearGradient id="activityGradient" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="#FF7043" />
-                        <stop offset="100%" stopColor="#FFB74D" />
-                      </linearGradient>
-                    </defs>
-                    <rect x="10" y="10" width="80" height="80" fill="#f0f0f0" rx="4" /> {/* Increased height */}
-                    <rect
-                      x="10"
-                      y={90 - (stats.activity.minutes / 60) * 80}
-                      width="80"
-                      height={(stats.activity.minutes / 60) * 80}
-                      fill="url(#activityGradient)"
-                      rx="4"
-                    />
-                    <line
-                      x1="0"
-                      y1="50"
-                      x2="100"
-                      y2="50"
-                      stroke="#666"
-                      strokeDasharray="2,2"
-                      strokeWidth="1"
-                    />
-                    <text
-                      x="50"
-                      y="105"
-                      textAnchor="middle"
-                      fill="currentColor"
-                      fontSize="8"
-                    >
-                      30 min target
-                    </text>
-                  </svg>
-                </div>
-              )}
+              <DetailText>{detail}</DetailText>
               <div style={{ 
-                marginTop: 'auto',
+                marginTop: '0.5rem',
                 display: 'flex',
                 gap: '0.5rem',
                 flexDirection: 'column'
