@@ -38,6 +38,7 @@ const Confetti = ({ trigger }) => (
 const DashboardContainer = styled.div`
   display: flex;
   flex-direction: row;
+  flex-wrap: nowrap; /* keep in one horizontal row on mobile */
   align-items: stretch;
   gap: 0.75rem;
   padding: 0.5rem 0 0.25rem;
@@ -46,8 +47,9 @@ const DashboardContainer = styled.div`
   /* Mobile: horizontal swipe */
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x mandatory; /* snap horizontally between cards */
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: rgba(0,0,0,0.25) transparent;
 
@@ -140,6 +142,7 @@ const StatCard = styled(Card)`
   padding: 1rem;
   /* remove large fixed min-height to prevent big blank areas */
   scroll-snap-align: start;
+  scroll-snap-stop: always; /* stronger snap behavior */
 
   /* Mobile card width: responsive clamp */
   flex: 0 0 auto;
