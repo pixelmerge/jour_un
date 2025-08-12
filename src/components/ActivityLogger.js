@@ -134,7 +134,7 @@ export default function ActivityLogger({ onSuccess }) {
   };
 
   if (!browserSupportsSpeechRecognition) {
-    return <span>Browser doesn't support speech recognition.</span>;
+    return <span>Browser doesn&apos;t support speech recognition.</span>;
   }
 
   return (
@@ -152,7 +152,7 @@ export default function ActivityLogger({ onSuccess }) {
           value={textInput} 
           onChange={(e) => setTextInput(e.target.value)} 
           rows="4" 
-          placeholder="Describe your activity (e.g., 'I walked for 30 minutes')"
+          placeholder={"Describe your activity (e.g., \"I walked for 30 minutes\")"}
           style={{ 
             width: '100%',
             padding: '0.75rem',

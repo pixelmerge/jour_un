@@ -88,7 +88,7 @@ export default function LoginPage() {
       </Form>
       <p>or</p>
       <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
-      <p>Don't have an account? <a href="/signup">Sign Up</a></p>
+  <p>Don&apos;t have an account? <a href="/signup">Sign Up</a></p>
     </Container>
   );
 }

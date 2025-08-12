@@ -103,7 +103,7 @@ export default function OnboardingPage() {
 
   return (
     <Container>
-      <h1>Welcome! Let's Set Your Goals.</h1>
+  <h1>Welcome! Let&apos;s Set Your Goals.</h1>
       <p>Defining your goals is the first step to success. Be specific!</p>
       <Form onSubmit={handleSubmit}>
         <div>
