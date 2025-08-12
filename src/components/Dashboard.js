@@ -10,6 +10,7 @@ import FoodLogger from './FoodLogger';
 import SleepTracker from './SleepTracker';
 import ActivityLogger from './ActivityLogger';
 import Modal from './ui/Modal';
+import LottieOverlay from './ui/LottieOverlay';
 import Timeline from './ui/Timeline';
 
 // Lightweight confetti burst using CSS circles (no new deps)
@@ -210,8 +211,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [streak, setStreak] = useState(0);
-  const [motivation, setMotivation] = useState(null);
+  // Motivation quote removed per request
   const [celebrate, setCelebrate] = useState(false);
+  // Overlay for inline sleep actions
+  const [animOpen, setAnimOpen] = useState(false);
+  const [animCfg, setAnimCfg] = useState(null);
 
   // Period metadata used across UI and calculations
   const periodMeta = useMemo(() => ({
@@ -342,32 +346,14 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [user, selectedPeriod]);
 
-  // Pull motivational insight when stats change
+  // Trigger a small celebration if any goal hits >= 100% for today
   useEffect(() => {
-    const run = async () => {
-      if (!user) return;
-      // throttle: only call once every 60s
-      const now = Date.now();
-      if (!window.__motivation_last__ || now - window.__motivation_last__ > 60000) {
-        try {
-          const res = await fetch('/api/motivation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stats, streak, periodLabel: (periodMeta[selectedPeriod]||{}).label })
-          });
-          const data = await res.json();
-          setMotivation(data);
-          window.__motivation_last__ = now;
-        } catch {}
-      }
-      // Trigger a small celebration if any goal hits >= 100% for today
-      if (selectedPeriod === 'today' && ((stats.activity.minutes >= 30) || (stats.calories.consumed >= stats.calories.target) || (Number(stats.sleep.hours) >= 8))) {
-        setCelebrate(true);
-        setTimeout(() => setCelebrate(false), 900);
-      }
-    };
-    run();
-  }, [user, stats.calories.consumed, stats.calories.burned, stats.activity.minutes, stats.sleep.hours, selectedPeriod]);
+    if (!user) return;
+    if (selectedPeriod === 'today' && ((stats.activity.minutes >= 30) || (stats.calories.consumed >= stats.calories.target) || (Number(stats.sleep.hours) >= 8))) {
+      setCelebrate(true);
+      setTimeout(() => setCelebrate(false), 900);
+    }
+  }, [user, selectedPeriod, stats.activity.minutes, stats.calories.consumed, stats.calories.target, stats.sleep.hours]);
 
   // Pass fetchStats to the sleep buttons
   const handleSleepStart = async () => {
@@ -394,7 +380,9 @@ export default function Dashboard() {
 
       if (error) throw error;
       
-      alert('Sleep time logged! Sweet dreams! 😴');
+  // Play sleep animation instead of alert
+  setAnimCfg({ path: '/animations/sleep.json', initialSegment: [0, 90], speed: 0.5, durationMs: 3000 });
+  setAnimOpen(true);
       await fetchStats();
     } catch (err) {
       console.error('Error logging sleep:', err);
@@ -485,9 +473,7 @@ export default function Dashboard() {
                 );
               })}
             </div>
-            <div style={{ minWidth: 220, flex: 1 }}>
-              <div style={{ fontSize: 14 }}>{motivation?.emoji || '✨'} {motivation?.message || 'Welcome back—let’s make today count.'}</div>
-            </div>
+            {/* Motivation quote removed */}
           </div>
           <Confetti trigger={celebrate} />
         </Card>
@@ -570,7 +556,9 @@ export default function Dashboard() {
                             
                           if (error) throw error;
                           
-                          alert('Sleep time logged! Sweet dreams! 😴');
+                          // Play sleep animation instead of alert
+                          setAnimCfg({ path: '/animations/sleep.json', initialSegment: [0, 90], speed: 0.5, durationMs: 3000 });
+                          setAnimOpen(true);
                           await fetchStats();
                         } catch (err) {
                           console.error('Error logging sleep:', err);
@@ -622,7 +610,9 @@ export default function Dashboard() {
 
                           if (error) throw error;
 
-                          alert(`Good morning! You slept for ${duration.toFixed(1)} hours.`);
+                          // Play wake animation instead of alert
+                          setAnimCfg({ path: '/animations/wake.json', fallbackPath: '/animations/sleep.json', initialSegment: [380, 480], speed: 0.5, durationMs: 3000 });
+                          setAnimOpen(true);
                           await fetchStats();
                         } catch (err) {
                           console.error('Error logging wake:', err);
@@ -715,6 +705,18 @@ export default function Dashboard() {
         </Modal>
       )}
     
+      {/* Global overlay for inline sleep actions */}
+      <LottieOverlay
+        open={animOpen}
+        animationPath={animCfg?.path}
+  fallbackAnimationPath={animCfg?.fallbackPath}
+        initialSegment={animCfg?.initialSegment}
+  speed={animCfg?.speed ?? 0.5}
+  durationMs={animCfg?.durationMs}
+  stripWhite
+        onClose={() => setAnimOpen(false)}
+      />
+
     </div>
   );
 }

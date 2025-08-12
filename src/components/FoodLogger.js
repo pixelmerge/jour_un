@@ -202,7 +202,7 @@ const TextArea = styled.textarea`
   }
 `;
 
-const FoodLogger = ({ onSuccess }) => {
+export default function FoodLogger({ onSuccess }) {
   const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
@@ -216,8 +216,9 @@ const FoodLogger = ({ onSuccess }) => {
   const [userComment, setUserComment] = useState('');
   const [isListening, setIsListening] = useState(false);
   const videoRef = useRef(null);
-  const [showCongrats, setShowCongrats] = useState(false);
   const recognitionRef = useRef(null);
+  const [animOpen, setAnimOpen] = useState(false);
+  const [animCfg, setAnimCfg] = useState(null);
 
   useEffect(() => {
     if ('webkitSpeechRecognition' in window) {
@@ -331,18 +332,19 @@ const FoodLogger = ({ onSuccess }) => {
   };
 
   const handleAnalyzeText = async () => {
-    if (!foodDescription.trim()) {
-      setError('Please enter a food description.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setAnalysis(null);
-
     try {
+      setError('');
+      setLoading(true);
+      setAnalysis(null);
+
+      const desc = (foodDescription || '').trim();
+      if (!desc) {
+        setError('Please enter a description');
+        return;
+      }
+
       const response = await axios.post('/api/food-text-analyzer', {
-        description: foodDescription,
+        description: desc,
       });
 
       if (response.data.success && response.data.analysis) {
@@ -369,6 +371,12 @@ const FoodLogger = ({ onSuccess }) => {
     }
   };
 
+  const showSavedAnim = () => {
+    setAnimCfg({ path: '/animations/food.json', durationMs: 3000, speed: 0.5 });
+    setAnimOpen(true);
+    setTimeout(() => setAnimOpen(false), 3000);
+  };
+
   const handleSave = async () => {
     try {
       if (!analysis) {
@@ -389,21 +397,21 @@ const FoodLogger = ({ onSuccess }) => {
 
       console.log('Saving entry:', entry);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('food_entries')
-        .insert([entry]);
+        .insert([entry])
+        .select()
+        .single();
 
-      if (error) throw error;
-
-  resetState();
-
-  // Show food animation overlay for ~3 seconds
-  setShowCongrats(true);
-  setTimeout(() => setShowCongrats(false), 3000);
-
-      if (typeof onSuccess === 'function') {
-        onSuccess();
+      if (error) {
+        throw error;
       }
+
+      resetState();
+
+      // Play animation and notify parent
+      showSavedAnim();
+      onSuccess?.(data);
     } catch (err) {
       console.error('Error saving food entry:', err);
       setError(err.message || 'Failed to save food entry');
@@ -496,215 +504,217 @@ const FoodLogger = ({ onSuccess }) => {
   const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] } });
 
   return (
-    <LoggerContainer>
-      <LottieOverlay 
-        show={showCongrats}
-        path="/animations/food.json"
-        durationMs={3000}
-        speed={0.5}
-        onHide={() => setShowCongrats(false)}
-      />
-      <h3>Log Your Meal</h3>
-      
-      <TabContainer>
-        <TabButton 
-          isActive={activeTab === 'text'} 
-          onClick={() => setActiveTab('text')}
-        >
-          <span role="img" aria-label="text">✍️</span>
-          Analyze Text
-        </TabButton>
-        <TabButton 
-          isActive={activeTab === 'camera'} 
-          onClick={() => setActiveTab('camera')}
-        >
-          <span role="img" aria-label="camera">📸</span>
-          Take Photo
-        </TabButton>
-        <TabButton 
-          isActive={activeTab === 'upload'} 
-          onClick={() => setActiveTab('upload')}
-        >
-          <span role="img" aria-label="upload">📤</span>
-          Upload Photo
-        </TabButton>
-      </TabContainer>
+    <>
+      <LoggerContainer>
+        <h3>Log Your Meal</h3>
+        
+        <TabContainer>
+          <TabButton 
+            isActive={activeTab === 'text'} 
+            onClick={() => setActiveTab('text')}
+          >
+            <span role="img" aria-label="text">✍️</span>
+            Analyze Text
+          </TabButton>
+          <TabButton 
+            isActive={activeTab === 'camera'} 
+            onClick={() => setActiveTab('camera')}
+          >
+            <span role="img" aria-label="camera">📸</span>
+            Take Photo
+          </TabButton>
+          <TabButton 
+            isActive={activeTab === 'upload'} 
+            onClick={() => setActiveTab('upload')}
+          >
+            <span role="img" aria-label="upload">📤</span>
+            Upload Photo
+          </TabButton>
+        </TabContainer>
 
-      {activeTab === 'text' && (
-        <div>
-          <h4>Analyze Food by Description</h4>
-          <InputGroup>
-            <TextArea
-              placeholder="e.g., 'A bowl of oatmeal with blueberries and a drizzle of honey' or '2 slices of pepperoni pizza'"
-              value={foodDescription}
-              onChange={(e) => setFoodDescription(e.target.value)}
-              rows="4"
-            />
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button onClick={handleAnalyzeText} disabled={loading}>
-                {loading ? 'Analyzing...' : 'Analyze Description'}
-              </Button>
-              {recognitionRef.current && (
-                <Button onClick={handleMicClick} disabled={loading}>
-                  {isListening ? 'Listening...' : '🎤 Speak'}
+        {activeTab === 'text' && (
+          <div>
+            <h4>Analyze Food by Description</h4>
+            <InputGroup>
+              <TextArea
+                placeholder="e.g., 'A bowl of oatmeal with blueberries and a drizzle of honey' or '2 slices of pepperoni pizza'"
+                value={foodDescription}
+                onChange={(e) => setFoodDescription(e.target.value)}
+                rows="4"
+              />
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Button onClick={handleAnalyzeText} disabled={loading}>
+                  {loading ? 'Analyzing...' : 'Analyze Description'}
                 </Button>
-              )}
-            </div>
-          </InputGroup>
-        </div>
-      )}
+                {recognitionRef.current && (
+                  <Button onClick={handleMicClick} disabled={loading}>
+                    {isListening ? 'Listening...' : '🎤 Speak'}
+                  </Button>
+                )}
+              </div>
+            </InputGroup>
+          </div>
+        )}
 
-      {activeTab === 'upload' && (
-        <>
-          <h4>Upload a Photo</h4>
-          <DropzoneContainer {...getRootProps()}>
-            <input {...getInputProps()} />
-            {loading ? (
-              <p>Processing...</p>
+        {activeTab === 'upload' && (
+          <>
+            <h4>Upload a Photo</h4>
+            <DropzoneContainer {...getRootProps()}>
+              <input {...getInputProps()} />
+              {loading ? (
+                <p>Processing...</p>
+              ) : (
+                <div>
+                  <p><span role="img" aria-label="upload">📤</span></p>
+                  <p>Drag & drop a food image here, or click to select one</p>
+                </div>
+              )}
+            </DropzoneContainer>
+          </>
+        )}
+
+        {activeTab === 'camera' && (
+          <div>
+            <h4>Take a Photo</h4>
+            {!cameraActive ? (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <Button 
+                  onClick={startCamera}
+                  style={{
+                    padding: '1rem 2rem',
+                    fontSize: '1.1rem'
+                  }}
+                >
+                  <span role="img" aria-label="camera">📸</span> Open Camera
+                </Button>
+                <p style={{ 
+                  marginTop: '0.5rem', 
+                  color: theme => theme.text.secondary,
+                  fontSize: '0.9rem' 
+                }}>
+                  Make sure to allow camera access when prompted
+                </p>
+              </div>
             ) : (
-              <div>
-                <p><span role="img" aria-label="upload">📤</span></p>
-                <p>Drag & drop a food image here, or click to select one</p>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center' 
+              }}>
+                <CameraPreview
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                <CameraControls>
+                  <CameraButton onClick={capturePhoto}>
+                    <span role="img" aria-label="capture">📸</span> Take Photo
+                  </CameraButton>
+                  <CameraButton 
+                    variant="danger" 
+                    onClick={stopCamera}
+                  >
+                    <span role="img" aria-label="close">❌</span> Close Camera
+                  </CameraButton>
+                </CameraControls>
               </div>
             )}
-          </DropzoneContainer>
-        </>
-      )}
-
-      {activeTab === 'camera' && (
-        <div>
-          <h4>Take a Photo</h4>
-          {!cameraActive ? (
-            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-              <Button 
-                onClick={startCamera}
-                style={{
-                  padding: '1rem 2rem',
-                  fontSize: '1.1rem'
-                }}
-              >
-                <span role="img" aria-label="camera">📸</span> Open Camera
-              </Button>
-              <p style={{ 
-                marginTop: '0.5rem', 
-                color: theme => theme.text.secondary,
-                fontSize: '0.9rem' 
-              }}>
-                Make sure to allow camera access when prompted
-              </p>
-            </div>
-          ) : (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center' 
-            }}>
-              <CameraPreview
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-              />
-              <CameraControls>
-                <CameraButton onClick={capturePhoto}>
-                  <span role="img" aria-label="capture">📸</span> Take Photo
-                </CameraButton>
-                <CameraButton 
-                  variant="danger" 
-                  onClick={stopCamera}
-                >
-                  <span role="img" aria-label="close">❌</span> Close Camera
-                </CameraButton>
-              </CameraControls>
-            </div>
-          )}
-        </div>
-      )}
-
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-      
-      {preview && (
-        <div style={{ 
-          margin: '1rem 0',
-        }}>
-          <div style={{
-            borderRadius: '8px',
-            overflow: 'hidden',
-            maxWidth: '300px',
-            marginBottom: '1rem'
-          }}>
-            <img 
-              src={preview} 
-              alt="Food preview" 
-              style={{ 
-                width: '100%',
-                height: 'auto',
-                display: 'block'
-              }} 
-            />
           </div>
-          <InputGroup>
-            <TextArea
-              placeholder="Add a comment to improve analysis (e.g., 'This was a large portion' or 'Dressing is light vinaigrette')"
-              value={userComment}
-              onChange={(e) => setUserComment(e.target.value)}
-              rows="2"
-            />
-            <Button onClick={() => onDrop([file])} disabled={loading}>
-              {loading ? 'Re-analyzing...' : 'Re-analyze with Comment'}
-            </Button>
-          </InputGroup>
-        </div>
-      )}
+        )}
 
-      {analysis && (
-        <AnalysisResult>
-          <h4>Analysis Results</h4>
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        
+        {preview && (
           <div style={{ 
-            display: 'grid', 
-            gap: '1rem',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            marginBottom: '1rem'
+            margin: '1rem 0',
           }}>
-            <div>
-              <strong>Food:</strong>
-              <p>{analysis.foodName}</p>
+            <div style={{
+              borderRadius: '8px',
+              overflow: 'hidden',
+              maxWidth: '300px',
+              marginBottom: '1rem'
+            }}>
+              <img 
+                src={preview} 
+                alt="Food preview" 
+                style={{ 
+                  width: '100%',
+                  height: 'auto',
+                  display: 'block'
+                }} 
+              />
             </div>
-            <div>
-              <strong>Portion:</strong>
-              <p>{analysis.portionSize}</p>
-            </div>
-            <div>
-              <strong>Calories:</strong>
-              <p>{analysis.calories} kcal</p>
-            </div>
+            <InputGroup>
+              <TextArea
+                placeholder="Add a comment to improve analysis (e.g., 'This was a large portion' or 'Dressing is light vinaigrette')"
+                value={userComment}
+                onChange={(e) => setUserComment(e.target.value)}
+                rows="2"
+              />
+              <Button onClick={() => onDrop([file])} disabled={loading}>
+                {loading ? 'Re-analyzing...' : 'Re-analyze with Comment'}
+              </Button>
+            </InputGroup>
           </div>
-          {analysis.nutrition && (
-            <div style={{ marginTop: '1rem' }}>
-              <strong>Nutrition:</strong>
-              <div style={{ 
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '1rem',
-                marginTop: '0.5rem'
-              }}>
-                <div>Protein: {analysis.nutrition.protein}</div>
-                <div>Carbs: {analysis.nutrition.carbs}</div>
-                <div>Fat: {analysis.nutrition.fat}</div>
+        )}
+
+        {analysis && (
+          <AnalysisResult>
+            <h4>Analysis Results</h4>
+            <div style={{ 
+              display: 'grid', 
+              gap: '1rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              marginBottom: '1rem'
+            }}>
+              <div>
+                <strong>Food:</strong>
+                <p>{analysis.foodName}</p>
+              </div>
+              <div>
+                <strong>Portion:</strong>
+                <p>{analysis.portionSize}</p>
+              </div>
+              <div>
+                <strong>Calories:</strong>
+                <p>{analysis.calories} kcal</p>
               </div>
             </div>
-          )}
-          <Button 
-            onClick={handleSave} 
-            disabled={loading}
-            style={{ marginTop: '1rem' }}
-          >
-            {loading ? 'Saving...' : 'Save Entry'}
-          </Button>
-        </AnalysisResult>
-      )}
-    </LoggerContainer>
+            {analysis.nutrition && (
+              <div style={{ marginTop: '1rem' }}>
+                <strong>Nutrition:</strong>
+                <div style={{ 
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '1rem',
+                  marginTop: '0.5rem'
+                }}>
+                  <div>Protein: {analysis.nutrition.protein}</div>
+                  <div>Carbs: {analysis.nutrition.carbs}</div>
+                  <div>Fat: {analysis.nutrition.fat}</div>
+                </div>
+              </div>
+            )}
+            <Button 
+              onClick={handleSave} 
+              disabled={loading}
+              style={{ marginTop: '1rem' }}
+            >
+              {loading ? 'Saving...' : 'Save Entry'}
+            </Button>
+          </AnalysisResult>
+        )}
+      </LoggerContainer>
+
+      {/* Global overlay for this modal */}
+      <LottieOverlay
+        open={animOpen}
+        animationPath={animCfg?.path}
+        durationMs={animCfg?.durationMs}
+        speed={animCfg?.speed ?? 0.5}
+        onClose={() => setAnimOpen(false)}
+      />
+    </>
   );
 };
-
-export default FoodLogger;

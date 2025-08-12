@@ -2,9 +2,9 @@
 import { useState } from 'react';
 import styled from '@emotion/styled';
 import LottieOverlay from './ui/LottieOverlay';
+import { Button as UIButton } from './ui/Button';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabaseClient';
-import { differenceInHours } from 'date-fns';
 
 const Form = styled.form`
   display: flex;
@@ -24,23 +24,26 @@ const Input = styled.input`
   color: ${({ theme }) => theme.text};
 `;
 
-const Button = styled.button`
-  padding: 0.75rem;
-  border-radius: 8px;
-  border: none;
-  background: ${({ theme }) => theme.primary};
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-`;
+// Use shared UIButton to keep styles consistent
 
-const SleepTracker = ({ onSuccess, onUpdate }) => {
+export default function SleepTracker(props) {
   const { user } = useAuth();
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [overlay, setOverlay] = useState({ show: false, segment: null });
-  
-  const handleSleepStart = async () => {
+  const [animOpen, setAnimOpen] = useState(false);
+  const [animCfg, setAnimCfg] = useState(null);
+
+  const playSleepStart = () => {
+  setAnimCfg({ path: '/animations/sleep.json', initialSegment: [0, 90], speed: 0.5, durationMs: 3000 });
+    setAnimOpen(true);
+  };
+  const playWakeUp = () => {
+  setAnimCfg({ path: '/animations/wake.json', fallbackPath: '/animations/sleep.json', initialSegment: [380, 480], speed: 0.5, durationMs: 3000 });
+    setAnimOpen(true);
+  };
+
+  const handleStartSleep = async () => {
     try {
       if (!user) {
         setError('Please sign in to track your sleep');
@@ -64,24 +67,22 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
         return;
       }
 
-      const { data, error: insertError } = await supabase
+      const { error } = await supabase
         .from('sleep_entries')
         .insert({
           user_id: user.id,
           start_time: new Date().toISOString(),
           quality: 'Pending',
           is_complete: false
-        })
-        .select('id')
-        .single();
+        });
 
-      if (insertError) throw insertError;
+      if (error) throw error;
 
-  setSuccess('Sleep start time logged successfully! 😴');
+      setSuccess('Sleep start time logged successfully! 😴');
       setError('');
-  setOverlay({ show: true, segment: [0, 90] });
-      if (onUpdate) await onUpdate();
-      if (onSuccess) onSuccess();
+      playSleepStart();
+      // overlay will auto-close at segment end (no durationMs set)
+      props.onSuccess?.('start');
     } catch (err) {
       console.error('Error logging sleep:', err);
       setError('Failed to log sleep start time');
@@ -127,7 +128,7 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
         quality = 'Very Poor';
       }
 
-      const { error: updateError } = await supabase
+      const { error } = await supabase
         .from('sleep_entries')
         .update({
           end_time: endTime.toISOString(),
@@ -138,16 +139,15 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
         .eq('id', lastEntry.id)
         .eq('user_id', user.id);
 
-      if (updateError) {
-        console.error('Error updating sleep entry:', updateError);
-        throw updateError;
+      if (error) {
+        console.error('Error updating sleep entry:', error);
+        throw error;
       }
 
-  setSuccess(`Wake up time logged! You slept for ${duration} hours (${quality} quality)`);
+      setSuccess(`Wake up time logged! You slept for ${duration} hours (${quality} quality)`);
       setError('');
-  setOverlay({ show: true, segment: [380, 480] });
-      if (onSuccess) onSuccess();
-      if (onUpdate) onUpdate(); // Call onUpdate to refresh stats
+      playWakeUp();
+      props.onSuccess?.('wake');
     } catch (err) {
       console.error('Error logging wake up:', err);
       setError('Failed to log wake up time. Please try again.');
@@ -156,29 +156,29 @@ const SleepTracker = ({ onSuccess, onUpdate }) => {
   };
 
   return (
-    <div style={{ padding: '1.5rem' }}>
-      <LottieOverlay 
-        show={overlay.show}
-        path="/animations/sleep and wake.json"
-        initialSegment={overlay.segment || undefined}
-        loop={false}
-        speed={0.5}
-        onHide={() => setOverlay({ show: false, segment: null })}
+    <>
+      <LottieOverlay
+        open={animOpen}
+  animationPath={animCfg?.path}
+  fallbackAnimationPath={animCfg?.fallbackPath}
+        initialSegment={animCfg?.initialSegment}
+  speed={animCfg?.speed ?? 0.5}
+  durationMs={animCfg?.durationMs}
+  stripWhite
+        onClose={() => setAnimOpen(false)}
       />
       {error && <p style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
       {success && <p style={{ color: 'green', marginBottom: '1rem' }}>{success}</p>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <Button onClick={handleSleepStart} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+        <UIButton variant="secondary" size="small" onClick={handleStartSleep} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
           <span role="img" aria-label="bed time" style={{ fontSize: '1.5rem' }}>🛏️</span>
           Going to Bed Now
-        </Button>
-        <Button onClick={handleWakeUp} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+        </UIButton>
+        <UIButton variant="secondary" size="small" onClick={handleWakeUp} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
           <span role="img" aria-label="wake up" style={{ fontSize: '1.5rem' }}>🌅</span>
           Just Woke Up
-        </Button>
+        </UIButton>
       </div>
-    </div>
+    </>
   );
 };
-
-export default SleepTracker;

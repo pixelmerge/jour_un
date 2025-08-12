@@ -22,7 +22,7 @@ const Button = styled.button`
   }
 `;
 
-const ActivityLogger = ({ onSuccess }) => {
+export default function ActivityLogger({ onSuccess }) {
   const { user } = useAuth();
   const [textInput, setTextInput] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -30,7 +30,8 @@ const ActivityLogger = ({ onSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { transcript, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
-  const [showCongrats, setShowCongrats] = useState(false);
+  const [animOpen, setAnimOpen] = useState(false);
+  const [animCfg, setAnimCfg] = useState(null);
 
   useEffect(() => {
     setTextInput(transcript);
@@ -93,6 +94,12 @@ const ActivityLogger = ({ onSuccess }) => {
     }
   };
   
+  const showSavedAnim = () => {
+    setAnimCfg({ path: '/animations/run.json', durationMs: 3000, speed: 0.5 });
+    setAnimOpen(true);
+    setTimeout(() => setAnimOpen(false), 3000);
+  };
+
   const handleSave = async () => {
     if (!analysis || !user) return;
     
@@ -106,19 +113,20 @@ const ActivityLogger = ({ onSuccess }) => {
         created_at: new Date().toISOString()
       };
 
-      const { error: dbError } = await supabase
+      const { data, error } = await supabase
         .from('activity_entries')
-        .insert([entry]);
+        .insert([entry])
+        .select()
+        .single();
 
-      if (dbError) throw dbError;
-
-  setTextInput('');
-      setAnalysis(null);
-  setShowCongrats(true);
-  setTimeout(() => setShowCongrats(false), 3000);
-      if (typeof onSuccess === 'function') {
-        onSuccess();
+      if (error) {
+        throw error;
       }
+
+      showSavedAnim();
+      onSuccess?.(data);
+      setTextInput('');
+      setAnalysis(null);
     } catch (err) {
       console.error('Error saving activity:', err);
       setError('Failed to save activity. Please try again.');
@@ -130,77 +138,77 @@ const ActivityLogger = ({ onSuccess }) => {
   }
 
   return (
-    <div>
-      <LottieOverlay 
-        show={showCongrats}
-        path="/animations/run.json"
-        durationMs={3000}
-        speed={0.5}
-        onHide={() => setShowCongrats(false)}
+    <>
+      <LottieOverlay
+        open={animOpen}
+        animationPath={animCfg?.path}
+        durationMs={animCfg?.durationMs}
+        speed={animCfg?.speed ?? 0.5}
+        onClose={() => setAnimOpen(false)}
       />
-      <h3>Log Your Activity</h3>
-      <textarea 
-        value={textInput} 
-        onChange={(e) => setTextInput(e.target.value)} 
-        rows="4" 
-        placeholder="Describe your activity (e.g., 'I walked for 30 minutes')"
-        style={{ 
-          width: '100%',
-          padding: '0.75rem',
-          borderRadius: '8px',
-          marginBottom: '1rem'
-        }} 
-      />
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-        <Button 
-          onClick={handleListen}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            background: isListening ? '#ff4444' : undefined
-          }}
-        >
-          <span role="img" aria-label="microphone">
-            {isListening ? '🔴' : '🎤'}
-          </span>
-          {isListening ? 'Stop Recording' : 'Start Recording'}
-        </Button>
-        <Button 
-          onClick={handleAnalyze} 
-          disabled={!textInput || loading}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <span role="img" aria-label="analyze">
-            {loading ? '⏳' : '📊'}
-          </span>
-          {loading ? 'Analyzing...' : 'Analyze Activity'}
-        </Button>
-      </div>
-
-      {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
-
-      {analysis && (
-        <div style={{ 
-          padding: '1rem', 
-          borderRadius: '8px',
-          background: 'rgba(0,0,0,0.05)',
-          marginBottom: '1rem'
-        }}>
-          <h4>Analysis Results:</h4>
-          <p><strong>Activity:</strong> {analysis.activity}</p>
-          <p><strong>Duration:</strong> {analysis.duration_minutes} minutes</p>
-          <p><strong>Estimated Calories Burned:</strong> {analysis.calories_burned}</p>
-          <p style={{ fontSize: '0.875rem', opacity: 0.8 }}>{analysis.disclaimer}</p>
-          <Button onClick={handleSave}>Save Activity</Button>
+      <div>
+        <h3>Log Your Activity</h3>
+        <textarea 
+          value={textInput} 
+          onChange={(e) => setTextInput(e.target.value)} 
+          rows="4" 
+          placeholder="Describe your activity (e.g., 'I walked for 30 minutes')"
+          style={{ 
+            width: '100%',
+            padding: '0.75rem',
+            borderRadius: '8px',
+            marginBottom: '1rem'
+          }} 
+        />
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <Button 
+            onClick={handleListen}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: isListening ? '#ff4444' : undefined
+            }}
+          >
+            <span role="img" aria-label="microphone">
+              {isListening ? '🔴' : '🎤'}
+            </span>
+            {isListening ? 'Stop Recording' : 'Start Recording'}
+          </Button>
+          <Button 
+            onClick={handleAnalyze} 
+            disabled={!textInput || loading}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <span role="img" aria-label="analyze">
+              {loading ? '⏳' : '📊'}
+            </span>
+            {loading ? 'Analyzing...' : 'Analyze Activity'}
+          </Button>
         </div>
-      )}
-    </div>
+
+        {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
+
+        {analysis && (
+          <div style={{ 
+            padding: '1rem', 
+            borderRadius: '8px',
+            background: 'rgba(0,0,0,0.05)',
+            marginBottom: '1rem'
+          }}>
+            <h4>Analysis Results:</h4>
+            <p><strong>Activity:</strong> {analysis.activity}</p>
+            <p><strong>Duration:</strong> {analysis.duration_minutes} minutes</p>
+            <p><strong>Estimated Calories Burned:</strong> {analysis.calories_burned}</p>
+            <p style={{ fontSize: '0.875rem', opacity: 0.8 }}>{analysis.disclaimer}</p>
+            <Button onClick={handleSave}>Save Activity</Button>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
-
-export default ActivityLogger;
