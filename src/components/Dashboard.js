@@ -37,39 +37,16 @@ const Confetti = ({ trigger }) => (
 
 const DashboardContainer = styled.div`
   display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap; /* keep in one horizontal row on mobile */
+  flex-direction: column; /* stack top to bottom on mobile */
   align-items: stretch;
   gap: 0.75rem;
   padding: 0.5rem 0 0.25rem;
   margin: 0 auto;
 
-  /* Mobile: horizontal swipe */
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x mandatory; /* snap horizontally between cards */
-  touch-action: pan-x pinch-zoom; /* smoother horizontal scrolling on touch */
-  overscroll-behavior-x: contain; /* prevent parent scroll chaining */
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: rgba(0,0,0,0.25) transparent;
-
-  &::-webkit-scrollbar { height: 6px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb {
-    background: linear-gradient(90deg, rgba(0,0,0,0.25), rgba(0,0,0,0.15));
-    border-radius: 999px;
-  }
-  &:hover::-webkit-scrollbar-thumb {
-    background: linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0.2));
-  }
-
-  /* Wide: show all three fully, no scroll */
+  /* Wide: show all three in a row */
   @media (min-width: 900px) {
     max-width: 900px;
-    overflow-x: visible;
-    scroll-snap-type: none;
+    flex-direction: row;
     justify-content: space-between;
   }
 `;
@@ -143,12 +120,9 @@ const StatCard = styled(Card)`
   transition: transform 0.2s, box-shadow 0.2s;
   padding: 1rem;
   /* remove large fixed min-height to prevent big blank areas */
-  scroll-snap-align: start;
-  scroll-snap-stop: always; /* stronger snap behavior */
-
-  /* Mobile card width: responsive clamp */
-  flex: 0 0 auto;
-  width: clamp(260px, 80vw, 320px);
+  /* Mobile: full-width vertical stack */
+  flex: 1 1 auto;
+  width: 100%;
 
   /* Wide: three equal columns with no overflow */
   @media (min-width: 900px) {
