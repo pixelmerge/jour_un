@@ -50,6 +50,8 @@ const DashboardContainer = styled.div`
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: x mandatory; /* snap horizontally between cards */
+  touch-action: pan-x pinch-zoom; /* smoother horizontal scrolling on touch */
+  overscroll-behavior-x: contain; /* prevent parent scroll chaining */
   scrollbar-width: thin; /* Firefox */
   scrollbar-color: rgba(0,0,0,0.25) transparent;
 
