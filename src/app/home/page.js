@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
@@ -33,7 +33,6 @@ export default function HomePage() {
   const { user, loading, refreshSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
 
   useEffect(() => {
     if (searchParams?.get('auth') === 'success') {
@@ -49,29 +48,7 @@ export default function HomePage() {
     }
   }, [user, loading, router]);
 
-  useEffect(() => {
-    async function checkOnboarding() {
-      if (!loading && user) {
-        setCheckingOnboarding(true);
-        // Fetch profile
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('height_cm, weight_kg, age, gender, physical_goal')
-          .eq('id', user.id)
-          .single();
-        // If any required field is missing, redirect to onboarding
-        if (!error && data && (
-          !data.height_cm || !data.weight_kg || !data.age || !data.gender || !data.physical_goal
-        )) {
-          router.push('/onboarding');
-        }
-        setCheckingOnboarding(false);
-      }
-    }
-    checkOnboarding();
-  }, [user, loading, router]);
-
-  if (loading || checkingOnboarding) {
+  if (loading) {
     return <LoadingContainer>Loading...</LoadingContainer>;
   }
 

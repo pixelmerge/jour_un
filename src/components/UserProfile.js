@@ -1,6 +1,187 @@
+'use client';
+import { useState, useEffect } from 'react';
+import styled from '@emotion/styled';
 import { useAuth } from '@/context/AuthProvider';
+import { supabase } from '@/lib/supabaseClient';
+import Image from 'next/image';
+import { FiUser, FiTarget, FiLogOut, FiUpload } from 'react-icons/fi';
+import { useRouter } from 'next/navigation';
 
-function UserProfile() {
+const ProfileContainer = styled.div`
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: ${({ theme }) => theme.cardBg};
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+`;
+
+const Header = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+`;
+
+const AvatarWrapper = styled.div`
+  position: relative;
+  width: 80px;
+  height: 80px;
+`;
+
+const AvatarImage = styled(Image)`
+  border-radius: 50%;
+  object-fit: cover;
+`;
+
+const AvatarUploadButton = styled.label`
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: ${({ theme }) => theme.primary};
+  color: white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid ${({ theme }) => theme.cardBg};
+`;
+
+const UserInfo = styled.div`
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  p {
+    color: ${({ theme }) => theme.text.secondary};
+    margin: 0;
+  }
+`;
+
+const Form = styled.form`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+`;
+
+const FormSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const SectionTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: ${({ theme }) => theme.text.primary};
+`;
+
+const Label = styled.label`
+  font-weight: 500;
+  color: ${({ theme }) => theme.text.secondary};
+`;
+
+const Input = styled.input`
+  padding: 0.8rem;
+  border: 1px solid ${({ theme }) => theme.borderColor};
+  border-radius: 8px;
+  background: ${({ theme }) => theme.inputBg};
+  color: ${({ theme }) => theme.text.primary};
+  width: 100%;
+`;
+
+const Select = styled.select`
+  padding: 0.8rem;
+  border: 1px solid ${({ theme }) => theme.borderColor};
+  border-radius: 8px;
+  background: ${({ theme }) => theme.inputBg};
+  color: ${({ theme }) => theme.text.primary};
+`;
+
+const ButtonContainer = styled.div`
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2rem;
+  gap: 1rem;
+`;
+
+const DangerZone = styled.div`
+  grid-column: 1 / -1;
+  margin-top: 3rem;
+  text-align: center;
+  color: ${({ theme }) => theme.error};
+`;
+
+const SubtleDeleteButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.error};
+  font-size: 1rem;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  transition: color 0.2s;
+  &:hover {
+    color: ${({ theme }) => theme.errorHover};
+  }
+`;
+
+const Button = styled.button`
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  background: ${({ theme }) => theme.primary};
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+
+  &:hover {
+    background: ${({ theme }) => theme.primaryHover};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+`;
+
+const DeleteButton = styled(Button)`
+  background: ${({ theme }) => theme.error};
+  &:hover {
+    background: ${({ theme }) => theme.errorHover};
+  }
+`;
+
+const LogoutButton = styled(Button)`
+  background: ${({ theme }) => theme.error};
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: ${({ theme }) => theme.errorHover};
+  }
+`;
+
+const Message = styled.p`
+  text-align: center;
+  grid-column: 1 / -1;
+  color: ${({ theme, type }) => type === 'success' ? theme.success : theme.error};
+`;
+
+export function UserProfile() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState({
@@ -20,7 +201,6 @@ function UserProfile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [dangerOpen, setDangerOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -108,12 +288,9 @@ function UserProfile() {
     router.push('/login');
   };
 
-  if (loading) {
-    return <div>Loading profile...</div>;
-  }
-  if (!user) {
-    return <div>Please sign in to view your profile.</div>;
-  }
+  if (loading) return <div>Loading profile...</div>;
+  if (!user) return <div>Please sign in to view your profile.</div>;
+
   return (
     <ProfileContainer>
       <Header>
@@ -196,41 +373,34 @@ function UserProfile() {
           </Button>
         </ButtonContainer>
         <DangerZone>
-          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setDangerOpen(v => !v)}>
-            Danger Zone {dangerOpen ? '▲' : '▼'}
+          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>Danger Zone</div>
+          <div style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+            Deleting your account will permanently erase all your data. This action cannot be undone.
           </div>
-          {dangerOpen && (
-            <>
-              <div style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>
-                Deleting your account will permanently erase all your data. This action cannot be undone.
-              </div>
-              <SubtleDeleteButton type="button" onClick={async () => {
-                if (!window.confirm('Are you absolutely sure? This will permanently delete your account and all data.')) return;
-                try {
-                  const res = await fetch('/api/delete-account', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: user.id })
-                  });
-                  if (res.ok) {
-                    alert('Your account and data have been deleted.');
-                    await signOut();
-                    router.push('/signup');
-                  } else {
-                    const err = await res.json();
-                    alert('Error deleting account: ' + (err.error || 'Unknown error'));
-                  }
-                } catch (err) {
-                  alert('Error deleting account: ' + err.message);
-                }
-              }}>
-                Delete my account
-              </SubtleDeleteButton>
-            </>
-          )}
+          <SubtleDeleteButton type="button" onClick={async () => {
+            if (!window.confirm('Are you absolutely sure? This will permanently delete your account and all data.')) return;
+            try {
+              const res = await fetch('/api/delete-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id })
+              });
+              if (res.ok) {
+                alert('Your account and data have been deleted.');
+                await signOut();
+                router.push('/signup');
+              } else {
+                const err = await res.json();
+                alert('Error deleting account: ' + (err.error || 'Unknown error'));
+              }
+            } catch (err) {
+              alert('Error deleting account: ' + err.message);
+            }
+          }}>
+            Delete my account
+          </SubtleDeleteButton>
         </DangerZone>
       </Form>
     </ProfileContainer>
   );
 }
-export default UserProfile;
