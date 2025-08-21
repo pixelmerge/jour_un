@@ -4,46 +4,37 @@ DROP FUNCTION IF EXISTS public.handle_new_user();
 DROP TABLE IF EXISTS food_entries;
 DROP TABLE IF EXISTS sleep_entries;
 DROP TABLE IF EXISTS activity_entries;
-DROP TABLE IF EXISTS user_profiles;  -- Add this line
 DROP TABLE IF EXISTS profiles;
 
--- Create user_profiles table for physical attributes
-CREATE TABLE user_profiles (
-    id UUID REFERENCES auth.users(id) PRIMARY KEY,
-    weight_kg NUMERIC,
-    height_cm NUMERIC,
-    age INTEGER,
-    gender TEXT,
-    activity_level TEXT,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-    CONSTRAINT weight_check CHECK (weight_kg > 0),
-    CONSTRAINT height_check CHECK (height_cm > 0),
-    CONSTRAINT age_check CHECK (age > 0)
-);
-
--- Modify profiles table to include both profile types
+-- Create profiles table
 CREATE TABLE profiles (
     id UUID REFERENCES auth.users(id) PRIMARY KEY,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     username TEXT UNIQUE,
     full_name TEXT,
     avatar_url TEXT,
+    weight_kg NUMERIC,
+    height_cm NUMERIC,
+    age INTEGER,
+    gender TEXT,
+    weekly_activity_minutes INTEGER,
+    sleep_duration_hours NUMERIC,
     physical_goal TEXT,
-    nutrition_goal TEXT,
-    activity_goal TEXT,
-    CONSTRAINT username_length CHECK (char_length(username) >= 3)
+    nutrition_goal_calories INTEGER,
+    activity_goal_minutes INTEGER,
+    sleep_goal_hours NUMERIC,
+    CONSTRAINT username_length CHECK (char_length(username) >= 3),
+    CONSTRAINT weight_check CHECK (weight_kg > 0),
+    CONSTRAINT height_check CHECK (height_cm > 0),
+    CONSTRAINT age_check CHECK (age > 0)
 );
 
--- Update handle_new_user function to create both profile entries
+-- Update handle_new_user function to create a profile entry
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
     INSERT INTO public.profiles (id, full_name, avatar_url)
     VALUES (new.id, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
-    
-    INSERT INTO public.user_profiles (id)
-    VALUES (new.id);
-    
     RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -93,7 +84,6 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE food_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sleep_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activity_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
 -- Users can manage their own profile.
@@ -105,16 +95,6 @@ CREATE POLICY "Users can view their own profile." ON profiles FOR SELECT USING (
 CREATE POLICY "Users can manage their own food entries." ON food_entries FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own sleep entries." ON sleep_entries FOR ALL USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage their own activity entries." ON activity_entries FOR ALL USING (auth.uid() = user_id);
-
--- Users can manage their own user profile.
-CREATE POLICY "Users can insert their own user profile." 
-    ON user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
-    
-CREATE POLICY "Users can update their own user profile." 
-    ON user_profiles FOR UPDATE USING (auth.uid() = id);
-    
-CREATE POLICY "Users can view their own user profile." 
-    ON user_profiles FOR SELECT USING (auth.uid() = id);
 
 -- Drop existing policies first
 DROP POLICY IF EXISTS "Users can manage their own sleep entries" ON sleep_entries;

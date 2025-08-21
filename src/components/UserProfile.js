@@ -4,93 +4,168 @@ import styled from '@emotion/styled';
 import { useAuth } from '@/context/AuthProvider';
 import { supabase } from '@/lib/supabaseClient';
 import Image from 'next/image';
+import { FiUser, FiTarget, FiLogOut, FiUpload } from 'react-icons/fi';
+import { useRouter } from 'next/navigation';
+
+const ProfileContainer = styled.div`
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: ${({ theme }) => theme.cardBg};
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+`;
+
+const Header = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+`;
+
+const AvatarWrapper = styled.div`
+  position: relative;
+  width: 80px;
+  height: 80px;
+`;
+
+const AvatarImage = styled(Image)`
+  border-radius: 50%;
+  object-fit: cover;
+`;
+
+const AvatarUploadButton = styled.label`
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: ${({ theme }) => theme.primary};
+  color: white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid ${({ theme }) => theme.cardBg};
+`;
+
+const UserInfo = styled.div`
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  p {
+    color: ${({ theme }) => theme.text.secondary};
+    margin: 0;
+  }
+`;
 
 const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  max-width: 600px;
-  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
 `;
 
 const FormSection = styled.div`
   display: flex;
   flex-direction: column;
+  gap: 1rem;
+`;
+
+const SectionTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  color: ${({ theme }) => theme.text.primary};
 `;
 
 const Label = styled.label`
   font-weight: 500;
-  color: ${({ theme }) => theme.text.primary};
+  color: ${({ theme }) => theme.text.secondary};
 `;
 
 const Input = styled.input`
-  padding: 0.75rem;
-  border: 1px solid ${({ theme }) => theme.border.primary};
+  padding: 0.8rem;
+  border: 1px solid ${({ theme }) => theme.borderColor};
   border-radius: 8px;
-  background: ${({ theme }) => theme.background.secondary};
+  background: ${({ theme }) => theme.inputBg};
   color: ${({ theme }) => theme.text.primary};
+  width: 100%;
 `;
 
 const Select = styled.select`
-  padding: 0.75rem;
-  border: 1px solid ${({ theme }) => theme.border.primary};
+  padding: 0.8rem;
+  border: 1px solid ${({ theme }) => theme.borderColor};
   border-radius: 8px;
-  background: ${({ theme }) => theme.background.secondary};
+  background: ${({ theme }) => theme.inputBg};
   color: ${({ theme }) => theme.text.primary};
 `;
 
+const ButtonContainer = styled.div`
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 2rem;
+`;
+
 const Button = styled.button`
-  padding: 0.75rem 1.5rem;
+  padding: 0.8rem 1.5rem;
   border-radius: 8px;
   border: none;
-  background: ${({ theme }) => theme.primaryButton.background};
-  color: ${({ theme }) => theme.primaryButton.text};
-  font-weight: 500;
+  background: ${({ theme }) => theme.primary};
+  color: white;
+  font-weight: 600;
   cursor: pointer;
-  
+  transition: background 0.3s;
+
+  &:hover {
+    background: ${({ theme }) => theme.primaryHover};
+  }
+
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
 `;
 
-const SectionTitle = styled.h2`
-  margin: 0.5rem 0;
-  font-size: 1.1rem;
-  color: ${({ theme }) => theme.text.primary};
-`;
-
-const AvatarWrapper = styled.div`
+const LogoutButton = styled(Button)`
+  background: ${({ theme }) => theme.error};
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
+
+  &:hover {
+    background: ${({ theme }) => theme.errorHover};
+  }
 `;
 
-const ErrorMessage = styled.div`
-  color: ${({ theme }) => theme.error};
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-`;
-
-const SuccessMessage = styled.div`
-  color: ${({ theme }) => theme.success};
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
+const Message = styled.p`
+  text-align: center;
+  grid-column: 1 / -1;
+  color: ${({ theme, type }) => type === 'success' ? theme.success : theme.error};
 `;
 
 export function UserProfile() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
   const [profile, setProfile] = useState({
+    full_name: '',
+    email: '',
     weight_kg: '',
     height_cm: '',
     age: '',
     gender: '',
-    activity_level: '',
-    full_name: '',
-    nutrition_goal: '',
     physical_goal: '',
-    activity_goal: ''
+    nutrition_goal_calories: '',
+    activity_goal_minutes: '',
+    sleep_goal_hours: '',
+    avatar_url: '',
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -105,34 +180,18 @@ export function UserProfile() {
 
   const loadProfile = async () => {
     try {
-      // Fetch user_profiles data
-      const { data: userProfile, error: userProfileError } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (userProfileError) throw userProfileError;
-
-      // Fetch profiles data
-      const { data: generalProfile, error: profileError } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (profileError) throw profileError;
-
-      setProfile({
-        ...userProfile,
-        full_name: generalProfile?.full_name || '',
-        nutrition_goal: generalProfile?.nutrition_goal || '',
-        physical_goal: generalProfile?.physical_goal || '',
-        activity_goal: generalProfile?.activity_goal || ''
-      });
+      if (error) throw error;
+      if (data) {
+        setProfile({ ...data, email: user.email });
+      }
     } catch (err) {
-      console.error('Error loading profile:', err);
-      setError('Failed to load profile data');
+      setError('Failed to load profile data.');
     } finally {
       setLoading(false);
     }
@@ -144,40 +203,21 @@ export function UserProfile() {
     setSuccess('');
     setLoading(true);
 
+    const { email, ...profileData } = profile;
+
     try {
-      // Update user_profiles
-      const { error: userProfileError } = await supabase
-        .from('user_profiles')
-        .upsert({
-          id: user.id,
-          weight_kg: profile.weight_kg,
-          height_cm: profile.height_cm,
-          age: profile.age,
-          gender: profile.gender,
-          activity_level: profile.activity_level,
-          updated_at: new Date().toISOString()
-        });
-
-      if (userProfileError) throw userProfileError;
-
-      // Update profiles
-      const { error: profileError } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
-          full_name: profile.full_name,
-          nutrition_goal: profile.nutrition_goal,
-          physical_goal: profile.physical_goal,
-          activity_goal: profile.activity_goal,
-          updated_at: new Date().toISOString()
+          ...profileData,
+          updated_at: new Date().toISOString(),
         });
 
-      if (profileError) throw profileError;
-
-      setSuccess('Profile updated successfully');
+      if (error) throw error;
+      setSuccess('Profile updated successfully!');
     } catch (err) {
-      console.error('Error saving profile:', err);
-      setError('Failed to save profile changes');
+      setError('Failed to save profile changes.');
     } finally {
       setLoading(false);
     }
@@ -188,138 +228,121 @@ export function UserProfile() {
     if (!file) return;
     try {
       setAvatarUploading(true);
-      const fileName = `${user.id}-${Date.now()}-${file.name}`;
+      const fileName = `${user.id}-${Date.now()}`;
       const { error: uploadError } = await supabase.storage
-        .from('food_images')
-        .upload(`avatars/${fileName}`, file, { upsert: false, contentType: file.type });
+        .from('avatars')
+        .upload(fileName, file);
+
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage
-        .from('food_images')
-        .getPublicUrl(`avatars/${fileName}`);
-      // Save to profiles
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      const publicUrl = data.publicUrl;
+
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
         .eq('id', user.id);
+
       if (profileError) throw profileError;
-      setSuccess('Profile photo updated');
+      setProfile(p => ({ ...p, avatar_url: publicUrl }));
+      setSuccess('Avatar updated!');
     } catch (err) {
-      console.error('Avatar upload error:', err);
-      setError('Failed to update profile photo');
+      setError('Failed to update avatar.');
     } finally {
       setAvatarUploading(false);
     }
   };
 
-  if (!user) return <div>Please sign in to view your profile.</div>;
+  const handleLogout = async () => {
+    await signOut();
+    router.push('/login');
+  };
+
   if (loading) return <div>Loading profile...</div>;
+  if (!user) return <div>Please sign in to view your profile.</div>;
 
   return (
-    <Form onSubmit={handleSubmit}>
-      {error && <ErrorMessage>{error}</ErrorMessage>}
-      {success && <SuccessMessage>{success}</SuccessMessage>}
-
-      <FormSection>
-        <SectionTitle>Profile</SectionTitle>
+    <ProfileContainer>
+      <Header>
         <AvatarWrapper>
-          <Image
-            src={(user.user_metadata?.avatar_url && user.user_metadata.avatar_url.startsWith('http'))
-              ? user.user_metadata.avatar_url
-              : '/icons/icon-192x192.png'}
+          <AvatarImage
+            src={profile.avatar_url || '/icons/icon-192x192.png'}
             alt="Avatar"
-            width={56}
-            height={56}
-            style={{ borderRadius: '50%', objectFit: 'cover' }}
+            width={80}
+            height={80}
           />
-          <div>
-            <input type="file" accept="image/*" onChange={handleAvatarUpload} disabled={avatarUploading} />
-            {avatarUploading && <div style={{ fontSize: '0.875rem' }}>Uploading…</div>}
-          </div>
+          <AvatarUploadButton htmlFor="avatar-upload">
+            <FiUpload />
+            <input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              disabled={avatarUploading}
+              style={{ display: 'none' }}
+            />
+          </AvatarUploadButton>
         </AvatarWrapper>
-        <Label>Full Name</Label>
-        <Input
-          type="text"
-          value={profile.full_name}
-          onChange={e => setProfile({ ...profile, full_name: e.target.value })}
-          placeholder="Your full name"
-        />
-      </FormSection>
+        <UserInfo>
+          <h1>{profile.full_name || 'User'}</h1>
+          <p>{profile.email}</p>
+        </UserInfo>
+      </Header>
 
-      <FormSection>
-        <SectionTitle>Physical Characteristics</SectionTitle>
-        <Input
-          type="number"
-          value={profile.weight_kg}
-          onChange={e => setProfile({ ...profile, weight_kg: e.target.value })}
-          placeholder="Weight (kg)"
-        />
-        <Input
-          type="number"
-          value={profile.height_cm}
-          onChange={e => setProfile({ ...profile, height_cm: e.target.value })}
-          placeholder="Height (cm)"
-        />
-        <Input
-          type="number"
-          value={profile.age}
-          onChange={e => setProfile({ ...profile, age: e.target.value })}
-          placeholder="Age"
-        />
-      </FormSection>
+      <Form onSubmit={handleSubmit}>
+        {error && <Message type="error">{error}</Message>}
+        {success && <Message type="success">{success}</Message>}
 
-      <FormSection>
-        <Label>Gender</Label>
-        <Select
-          value={profile.gender}
-          onChange={e => setProfile({ ...profile, gender: e.target.value })}
-        >
-          <option value="">Select Gender</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
-          <option value="other">Other</option>
-        </Select>
-      </FormSection>
+        <FormSection>
+          <SectionTitle><FiUser /> Personal Info</SectionTitle>
+          <Label htmlFor="full_name">Full Name</Label>
+          <Input id="full_name" type="text" value={profile.full_name || ''} onChange={e => setProfile({ ...profile, full_name: e.target.value })} />
+          
+          <Label htmlFor="weight_kg">Weight (kg)</Label>
+          <Input id="weight_kg" type="number" value={profile.weight_kg || ''} onChange={e => setProfile({ ...profile, weight_kg: e.target.value })} />
+          
+          <Label htmlFor="height_cm">Height (cm)</Label>
+          <Input id="height_cm" type="number" value={profile.height_cm || ''} onChange={e => setProfile({ ...profile, height_cm: e.target.value })} />
+          
+          <Label htmlFor="age">Age</Label>
+          <Input id="age" type="number" value={profile.age || ''} onChange={e => setProfile({ ...profile, age: e.target.value })} />
+          
+          <Label htmlFor="gender">Gender</Label>
+          <Select id="gender" value={profile.gender || ''} onChange={e => setProfile({ ...profile, gender: e.target.value })}>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </Select>
+        </FormSection>
 
-      <FormSection>
-        <Label>Activity Level</Label>
-        <Select
-          value={profile.activity_level}
-          onChange={e => setProfile({ ...profile, activity_level: e.target.value })}
-        >
-          <option value="">Select Activity Level</option>
-          <option value="sedentary">Sedentary</option>
-          <option value="light">Lightly Active</option>
-          <option value="moderate">Moderately Active</option>
-          <option value="active">Active</option>
-          <option value="very_active">Very Active</option>
-        </Select>
-      </FormSection>
+        <FormSection>
+          <SectionTitle><FiTarget /> Goals</SectionTitle>
+          <Label htmlFor="physical_goal">Primary Goal</Label>
+          <Select id="physical_goal" value={profile.physical_goal || ''} onChange={e => setProfile({ ...profile, physical_goal: e.target.value })}>
+            <option value="lose_weight">Lose Weight</option>
+            <option value="gain_weight">Gain Weight</option>
+            <option value="build_muscle">Build Muscle</option>
+          </Select>
 
-      <FormSection>
-        <SectionTitle>Goals</SectionTitle>
-        <Input
-          type="text"
-          value={profile.nutrition_goal}
-          onChange={e => setProfile({ ...profile, nutrition_goal: e.target.value })}
-          placeholder="Nutrition Goal"
-        />
-        <Input
-          type="text"
-          value={profile.physical_goal}
-          onChange={e => setProfile({ ...profile, physical_goal: e.target.value })}
-          placeholder="Physical Goal"
-        />
-        <Input
-          type="text"
-          value={profile.activity_goal}
-          onChange={e => setProfile({ ...profile, activity_goal: e.target.value })}
-          placeholder="Activity Goal"
-        />
-      </FormSection>
+          <Label htmlFor="nutrition_goal_calories">Daily Calorie Goal</Label>
+          <Input id="nutrition_goal_calories" type="number" value={profile.nutrition_goal_calories || ''} onChange={e => setProfile({ ...profile, nutrition_goal_calories: e.target.value })} />
+          
+          <Label htmlFor="activity_goal_minutes">Daily Activity Goal (minutes)</Label>
+          <Input id="activity_goal_minutes" type="number" value={profile.activity_goal_minutes || ''} onChange={e => setProfile({ ...profile, activity_goal_minutes: e.target.value })} />
+          
+          <Label htmlFor="sleep_goal_hours">Nightly Sleep Goal (hours)</Label>
+          <Input id="sleep_goal_hours" type="number" step="0.5" value={profile.sleep_goal_hours || ''} onChange={e => setProfile({ ...profile, sleep_goal_hours: e.target.value })} />
+        </FormSection>
 
-      <Button type="submit" disabled={loading}>
-        {loading ? 'Saving...' : 'Save Profile'}
-      </Button>
-    </Form>
+        <ButtonContainer>
+          <LogoutButton onClick={handleLogout}>
+            <FiLogOut /> Logout
+          </LogoutButton>
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </ButtonContainer>
+      </Form>
+    </ProfileContainer>
   );
 }
