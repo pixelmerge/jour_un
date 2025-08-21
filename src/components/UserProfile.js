@@ -1,3 +1,5 @@
+import { useAuth } from '@/context/AuthProvider';
+
 function UserProfile() {
   const { user, signOut } = useAuth();
   const router = useRouter();
