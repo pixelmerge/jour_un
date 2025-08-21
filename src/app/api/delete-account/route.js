@@ -10,11 +10,12 @@ export async function POST(req) {
     const { userId } = await req.json();
     if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
 
-    // Delete user data from all tables
-    await supabase.from('food_entries').delete().eq('user_id', userId);
-    await supabase.from('sleep_entries').delete().eq('user_id', userId);
-    await supabase.from('activity_entries').delete().eq('user_id', userId);
-    await supabase.from('profiles').delete().eq('id', userId);
+  // Delete user data from all tables
+  await supabase.from('food_entries').delete().eq('user_id', userId);
+  await supabase.from('sleep_entries').delete().eq('user_id', userId);
+  await supabase.from('activity_entries').delete().eq('user_id', userId);
+  await supabase.from('user_profiles').delete().eq('id', userId);
+  await supabase.from('profiles').delete().eq('id', userId);
 
     // Delete user from Supabase Auth
     const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {

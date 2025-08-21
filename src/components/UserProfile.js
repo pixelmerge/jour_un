@@ -115,6 +115,28 @@ const ButtonContainer = styled.div`
   gap: 1rem;
 `;
 
+const DangerZone = styled.div`
+  grid-column: 1 / -1;
+  margin-top: 3rem;
+  text-align: center;
+  color: ${({ theme }) => theme.error};
+`;
+
+const SubtleDeleteButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.error};
+  font-size: 1rem;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  transition: color 0.2s;
+  &:hover {
+    color: ${({ theme }) => theme.errorHover};
+  }
+`;
+
 const Button = styled.button`
   padding: 0.8rem 1.5rem;
   border-radius: 8px;
@@ -349,8 +371,14 @@ export function UserProfile() {
           <Button type="submit" disabled={loading}>
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
-          <DeleteButton type="button" onClick={async () => {
-            if (!window.confirm('Are you sure you want to delete your account and all data? This cannot be undone.')) return;
+        </ButtonContainer>
+        <DangerZone>
+          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>Danger Zone</div>
+          <div style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+            Deleting your account will permanently erase all your data. This action cannot be undone.
+          </div>
+          <SubtleDeleteButton type="button" onClick={async () => {
+            if (!window.confirm('Are you absolutely sure? This will permanently delete your account and all data.')) return;
             try {
               const res = await fetch('/api/delete-account', {
                 method: 'POST',
@@ -369,9 +397,9 @@ export function UserProfile() {
               alert('Error deleting account: ' + err.message);
             }
           }}>
-            Delete Account
-          </DeleteButton>
-        </ButtonContainer>
+            Delete my account
+          </SubtleDeleteButton>
+        </DangerZone>
       </Form>
     </ProfileContainer>
   );
