@@ -288,9 +288,12 @@ const Message = styled.p`
     router.push('/login');
   };
 
-  if (loading) return <div>Loading profile...</div>;
-  if (!user) return <div>Please sign in to view your profile.</div>;
-
+  if (loading) {
+    return <div>Loading profile...</div>;
+  }
+  if (!user) {
+    return <div>Please sign in to view your profile.</div>;
+  }
   return (
     <ProfileContainer>
       <Header>
