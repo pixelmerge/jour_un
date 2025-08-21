@@ -21,6 +21,7 @@
     "framer-motion": "^12.23.12",
     "lottie-react": "^2.4.1",
     "next": "^14.2.0",
+    "node-fetch": "^3.3.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.3.8",

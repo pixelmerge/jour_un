@@ -112,6 +112,7 @@ const ButtonContainer = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-top: 2rem;
+  gap: 1rem;
 `;
 
 const Button = styled.button`
@@ -131,6 +132,13 @@ const Button = styled.button`
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+`;
+
+const DeleteButton = styled(Button)`
+  background: ${({ theme }) => theme.error};
+  &:hover {
+    background: ${({ theme }) => theme.errorHover};
   }
 `;
 
@@ -341,6 +349,28 @@ export function UserProfile() {
           <Button type="submit" disabled={loading}>
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>
+          <DeleteButton type="button" onClick={async () => {
+            if (!window.confirm('Are you sure you want to delete your account and all data? This cannot be undone.')) return;
+            try {
+              const res = await fetch('/api/delete-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id })
+              });
+              if (res.ok) {
+                alert('Your account and data have been deleted.');
+                await signOut();
+                router.push('/signup');
+              } else {
+                const err = await res.json();
+                alert('Error deleting account: ' + (err.error || 'Unknown error'));
+              }
+            } catch (err) {
+              alert('Error deleting account: ' + err.message);
+            }
+          }}>
+            Delete Account
+          </DeleteButton>
         </ButtonContainer>
       </Form>
     </ProfileContainer>
