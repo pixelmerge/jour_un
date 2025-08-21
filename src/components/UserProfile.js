@@ -181,7 +181,6 @@ const Message = styled.p`
   color: ${({ theme, type }) => type === 'success' ? theme.success : theme.error};
 `;
 
-export function UserProfile() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState({
@@ -201,6 +200,7 @@ export function UserProfile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [dangerOpen, setDangerOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -373,34 +373,40 @@ export function UserProfile() {
           </Button>
         </ButtonContainer>
         <DangerZone>
-          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>Danger Zone</div>
-          <div style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>
-            Deleting your account will permanently erase all your data. This action cannot be undone.
+          <div style={{ fontWeight: 'bold', marginBottom: '0.5rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setDangerOpen(v => !v)}>
+            Danger Zone {dangerOpen ? '▲' : '▼'}
           </div>
-          <SubtleDeleteButton type="button" onClick={async () => {
-            if (!window.confirm('Are you absolutely sure? This will permanently delete your account and all data.')) return;
-            try {
-              const res = await fetch('/api/delete-account', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: user.id })
-              });
-              if (res.ok) {
-                alert('Your account and data have been deleted.');
-                await signOut();
-                router.push('/signup');
-              } else {
-                const err = await res.json();
-                alert('Error deleting account: ' + (err.error || 'Unknown error'));
-              }
-            } catch (err) {
-              alert('Error deleting account: ' + err.message);
-            }
-          }}>
-            Delete my account
-          </SubtleDeleteButton>
+          {dangerOpen && (
+            <>
+              <div style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>
+                Deleting your account will permanently erase all your data. This action cannot be undone.
+              </div>
+              <SubtleDeleteButton type="button" onClick={async () => {
+                if (!window.confirm('Are you absolutely sure? This will permanently delete your account and all data.')) return;
+                try {
+                  const res = await fetch('/api/delete-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user.id })
+                  });
+                  if (res.ok) {
+                    alert('Your account and data have been deleted.');
+                    await signOut();
+                    router.push('/signup');
+                  } else {
+                    const err = await res.json();
+                    alert('Error deleting account: ' + (err.error || 'Unknown error'));
+                  }
+                } catch (err) {
+                  alert('Error deleting account: ' + err.message);
+                }
+              }}>
+                Delete my account
+              </SubtleDeleteButton>
+            </>
+          )}
         </DangerZone>
       </Form>
     </ProfileContainer>
   );
-}
+// ...existing code...

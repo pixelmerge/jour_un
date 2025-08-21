@@ -47,6 +47,10 @@ const Button = styled.button`
   }
 `;
 
+const GoogleButton = styled(Button)`
+  background: #db4437;
+`;
+
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,6 +83,15 @@ export default function SignupPage() {
     }
   };
 
+  const handleGoogleSignup = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  };
+
   return (
     <Container>
       <h1>Create Account</h1>
@@ -90,6 +103,8 @@ export default function SignupPage() {
         {message && <p style={{ color: 'green' }}>{message}</p>}
         <Button type="submit">Sign Up</Button>
       </Form>
+      <p>or</p>
+      <GoogleButton onClick={handleGoogleSignup}>Sign up with Google</GoogleButton>
       <p style={{ marginTop: '1rem' }}>
         Already have an account? <a href="/login">Log In</a>
       </p>
