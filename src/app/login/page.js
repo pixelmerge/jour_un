@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
@@ -50,6 +50,39 @@ export default function LoginPage() {
   const [oauthError, setOauthError] = useState(null);
   const router = useRouter();
 
+  // Handle fragment-based OAuth responses (e.g. /login#access_token=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const hash = window.location.hash || '';
+    if (!hash) return;
+
+    // If the hash contains OAuth tokens or an error, let Supabase parse and store the session
+    if (hash.includes('access_token') || hash.includes('refresh_token') || hash.includes('error')) {
+      (async () => {
+        try {
+          // getSessionFromUrl parses the fragment and sets the session in the client
+          const { data, error } = await supabase.auth.getSessionFromUrl();
+          if (error) {
+            console.error('getSessionFromUrl error:', error);
+            setOauthError(error.message || 'OAuth error');
+            return;
+          }
+
+          // Remove the hash from the URL to clean it up
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+          // If session present, navigate into the app
+          if (data?.session || supabase.auth.getSession()) {
+            router.push('/');
+          }
+        } catch (err) {
+          console.error('Failed to process OAuth fragment:', err);
+        }
+      })();
+    }
+  }, [router]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(null);
@@ -82,12 +115,13 @@ export default function LoginPage() {
 
       // Some SDK versions return a url to redirect to. If present, navigate there.
       if (data?.url) {
-        window.location.href = data.url;
+        // Use assign for a more explicit navigation (works like href)
+        window.location.assign(data.url);
       }
       // Otherwise the SDK should have already redirected the browser.
     } catch (err) {
-      console.error('Error starting Google sign-in:', err);
-      setOauthError('Failed to start Google sign-in');
+  console.error('Error starting Google sign-in:', err);
+  setOauthError('Failed to start Google sign-in');
     }
   };
 
@@ -107,7 +141,7 @@ export default function LoginPage() {
       </Form>
   <p>or</p>
   {oauthError && <p style={{ color: 'red' }}>{oauthError}</p>}
-  <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
+  <GoogleButton type="button" onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
   <p>Don&apos;t have an account? <a href="/signup">Sign Up</a></p>
     </Container>
   );
