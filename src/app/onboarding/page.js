@@ -318,8 +318,10 @@ const personalInfoSchema = z.object({
   height_cm: z.number().positive(),
   weight_kg: z.number().positive(),
   age: z.number().positive().int(),
-  gender: z.enum(['male', 'female', 'other']),
-  weekly_activity_minutes: z.number().positive().int(),
+  // gender optional and no default selection
+  gender: z.enum(['male', 'female', 'other']).optional(),
+  // use activity_level instead of raw minutes on onboarding
+  activity_level: z.enum(['sedentary', 'moderate', 'active']),
   sleep_duration_hours: z.number().positive(),
 });
 
@@ -337,8 +339,8 @@ export default function OnboardingPage() {
     height_cm: '',
     weight_kg: '',
     age: '',
-    gender: 'male',
-    weekly_activity_minutes: '',
+    gender: '',
+    activity_level: '',
     sleep_duration_hours: '',
     physical_goal: 'lose_weight',
     target_weight_change_kg: '',
@@ -372,7 +374,7 @@ export default function OnboardingPage() {
       height_cm: parseFloat(formData.height_cm),
       weight_kg: parseFloat(formData.weight_kg),
       age: parseInt(formData.age),
-      weekly_activity_minutes: parseInt(formData.weekly_activity_minutes),
+      activity_level: formData.activity_level,
       sleep_duration_hours: parseFloat(formData.sleep_duration_hours),
     };
 
@@ -406,23 +408,21 @@ export default function OnboardingPage() {
       return;
     }
 
-    // Validate for safe goals
-    if (formData.physical_goal === 'lose_weight') {
-        const weeklyChange = dataToValidate.target_weight_change_kg / dataToValidate.target_weeks;
-        if (weeklyChange > 1) {
-            setFormErrors({ form: 'A safe weight loss goal is a maximum of 1kg per week.' });
-            return;
-        }
+  // Provide warnings for aggressive goals but do not block the user.
+  if (formData.physical_goal === 'lose_weight' && dataToValidate.target_weight_change_kg && dataToValidate.target_weeks) {
+    const weeklyChange = dataToValidate.target_weight_change_kg / dataToValidate.target_weeks;
+    if (weeklyChange > 1) {
+      setFormErrors({ warning: 'This is an aggressive weight loss goal (>1 kg/week). We recommend slower, sustainable changes.' });
     }
-    if (formData.physical_goal === 'gain_weight') {
-        const weeklyChange = dataToValidate.target_weight_change_kg / dataToValidate.target_weeks;
-        if (weeklyChange > 0.5) {
-            setFormErrors({ form: 'A safe weight gain goal is a maximum of 0.5kg per week.' });
-            return;
-        }
+  }
+  if (formData.physical_goal === 'gain_weight' && dataToValidate.target_weight_change_kg && dataToValidate.target_weeks) {
+    const weeklyChange = dataToValidate.target_weight_change_kg / dataToValidate.target_weeks;
+    if (weeklyChange > 0.75) {
+      setFormErrors({ warning: 'This is an aggressive weight gain goal. Consider a more gradual target.' });
     }
+  }
 
-    handleGeneratePlan();
+  handleGeneratePlan();
   };
 
   const handleGeneratePlan = async () => {
@@ -430,15 +430,17 @@ export default function OnboardingPage() {
     setStep(3);
 
     try {
-      const response = await fetch('/api/generate-goals', {
+    const response = await fetch('/api/generate-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           height: formData.height_cm,
           weight: formData.weight_kg,
           age: formData.age,
-          gender: formData.gender,
-          activity: formData.weekly_activity_minutes,
+      gender: formData.gender || undefined,
+      activity_level: formData.activity_level,
+      // include assumed numeric minutes for downstream services
+      activity: mapActivityLevelToMinutes(formData.activity_level),
           sleep: formData.sleep_duration_hours,
           goal: formData.physical_goal,
           target_weight_change_kg: formData.target_weight_change_kg,
@@ -476,6 +478,7 @@ export default function OnboardingPage() {
   const handleSaveGoals = async () => {
     // Only include valid fields for user_profiles
     const validFields = [
+  'id',
       'height_cm',
       'weight_kg',
       'age',
@@ -496,11 +499,15 @@ export default function OnboardingPage() {
       'height_cm', 'weight_kg', 'age', 'weekly_activity_minutes', 'sleep_duration_hours',
       'target_weight_change_kg', 'target_weeks', 'daily_calorie_target', 'activity_minutes_target', 'sleep_target_hours'
     ];
+    const mappedActivityMinutes = suggestedGoals?.activity || mapActivityLevelToMinutes(formData.activity_level);
+
     const rawData = {
+      id: user.id,
       ...formData,
-      daily_calorie_target: suggestedGoals.calories,
-      activity_minutes_target: suggestedGoals.activity,
-      sleep_target_hours: suggestedGoals.sleep,
+      daily_calorie_target: suggestedGoals?.calories,
+      activity_minutes_target: mappedActivityMinutes,
+      weekly_activity_minutes: mappedActivityMinutes,
+      sleep_target_hours: suggestedGoals?.sleep,
       onboarding_complete: true,
       ai_consent: aiConsent,
     };
@@ -510,10 +517,10 @@ export default function OnboardingPage() {
         .map(([key, value]) => [key, numericFields.includes(key) ? Number(value) : value])
     );
 
+    // Use upsert so a profile row is created if it doesn't already exist
     const { error } = await supabase
       .from('user_profiles')
-      .update(finalData)
-      .eq('id', user.id);
+      .upsert(finalData, { onConflict: ['id'] });
 
     if (error) {
       setFormErrors({ form: 'Could not save your profile. Please try again.' });
@@ -533,6 +540,20 @@ export default function OnboardingPage() {
       preserveAspectRatio: 'xMidYMid slice',
     },
   };
+
+  // Helper to map activity level to an assumed weekly minutes value
+  function mapActivityLevelToMinutes(level) {
+    switch (level) {
+      case 'sedentary':
+        return 30; // very low weekly minutes
+      case 'moderate':
+        return 150; // WHO moderate baseline
+      case 'active':
+        return 300; // higher activity
+      default:
+        return 150;
+    }
+  }
 
   if (loading || !user) {
     return (
@@ -617,26 +638,24 @@ export default function OnboardingPage() {
                   <FormGroup>
                     <Label htmlFor="gender">Gender</Label>
                     <Select name="gender" value={formData.gender} onChange={handleChange}>
+                      <option value="">Select gender (optional)</option>
                       <option value="male">Male</option>
                       <option value="female">Female</option>
                       <option value="other">Other</option>
                     </Select>
                   </FormGroup>
                 </div>
-
                 <FormGroup>
-                  <Label htmlFor="weekly_activity_minutes">
-                    <FiActivity /> Weekly Activity (minutes)
+                  <Label htmlFor="activity_level">
+                    <FiActivity /> Weekly activity level
                   </Label>
-                  <Input 
-                    id="weekly_activity_minutes" 
-                    name="weekly_activity_minutes" 
-                    type="number" 
-                    placeholder="150"
-                    value={formData.weekly_activity_minutes} 
-                    onChange={handleChange} 
-                  />
-                  {formErrors.weekly_activity_minutes && <ErrorMessage>{formErrors.weekly_activity_minutes}</ErrorMessage>}
+                  <Select name="activity_level" value={formData.activity_level} onChange={handleChange}>
+                    <option value="">Select your activity level</option>
+                    <option value="sedentary">Sedentary</option>
+                    <option value="moderate">Moderate</option>
+                    <option value="active">Active</option>
+                  </Select>
+                  {formErrors.activity_level && <ErrorMessage>{formErrors.activity_level}</ErrorMessage>}
                 </FormGroup>
 
                 <FormGroup>
