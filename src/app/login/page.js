@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import styled from '@emotion/styled';
@@ -49,6 +49,35 @@ export default function LoginPage() {
   const [error, setError] = useState(null);
   const router = useRouter();
 
+  // If the user is already signed in, redirect away from the login page
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data?.session;
+        if (mounted && session?.user) {
+          router.replace('/');
+        }
+      } catch (err) {
+        console.error('Error checking session on login page:', err);
+      }
+    })();
+
+    // Subscribe to auth state changes while on the page
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        router.replace('/');
+      }
+    });
+
+    return () => {
+      mounted = false;
+      try { subscription.unsubscribe(); } catch (e) {}
+    };
+  }, [router]);
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError(null);
@@ -86,8 +115,8 @@ export default function LoginPage() {
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <Button type="submit">Log In</Button>
       </Form>
-      <p>or</p>
-      <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
+  <p>or</p>
+  <GoogleButton type="button" onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
   <p>Don&apos;t have an account? <a href="/signup">Sign Up</a></p>
     </Container>
   );
