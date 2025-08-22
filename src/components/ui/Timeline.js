@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import styled from '@emotion/styled';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthProvider';
 
 const TimelineContainer = styled.div`

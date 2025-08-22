@@ -67,40 +67,68 @@ export default function HomePage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [avatarUrl, setAvatarUrl] = useState(null);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
+  // Check onboarding status and redirect accordingly
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
-  }, [user, loading, router]);
+    async function checkUserStatus() {
+      if (loading) return; // Wait for auth to load
+      
+      if (!user) {
+        router.push('/login');
+        return;
+      }
 
-  useEffect(() => {
-    const loadAvatar = async () => {
-      if (!user) return;
       try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('avatar_url')
+        // Check if user profile exists and if onboarding is complete
+        const { data: profile, error } = await supabase
+          .from('user_profiles')
+          .select('onboarding_complete, avatar_url')
           .eq('id', user.id)
           .single();
-        setAvatarUrl(data?.avatar_url || user.user_metadata?.avatar_url || null);
-      } catch {
-        setAvatarUrl(user?.user_metadata?.avatar_url || null);
-      }
-    };
-    loadAvatar();
-  }, [user]);
 
-  if (loading) {
+        if (error) {
+          console.error('Error fetching user profile:', error);
+          // If profile doesn't exist, redirect to onboarding
+          if (error.code === 'PGRST116') {
+            console.log('No user profile found, redirecting to onboarding');
+            router.push('/onboarding');
+            return;
+          }
+        } else if (profile) {
+          // Set avatar from profile data
+          setAvatarUrl(profile.avatar_url || user.user_metadata?.avatar_url || null);
+          
+          // Check onboarding status
+          if (!profile.onboarding_complete) {
+            console.log('Onboarding not complete, redirecting...');
+            router.push('/onboarding');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Error checking user status:', err);
+        // On error, redirect to onboarding to be safe
+        router.push('/onboarding');
+        return;
+      }
+
+      setCheckingOnboarding(false);
+    }
+
+    checkUserStatus();
+  }, [user, loading, router]);
+
+  // Loading state
+  if (loading || checkingOnboarding) {
     return (
-      <>
-        <LoadingContainer>
-          <div>Loading...</div>
-        </LoadingContainer>
-      </>
+      <LoadingContainer>
+        <div>Loading...</div>
+      </LoadingContainer>
     );
   }
-  
+
+  // Not authenticated
   if (!user) {
     return null;
   }

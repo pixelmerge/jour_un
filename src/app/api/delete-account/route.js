@@ -15,7 +15,6 @@ export async function POST(req) {
   await supabase.from('sleep_entries').delete().eq('user_id', userId);
   await supabase.from('activity_entries').delete().eq('user_id', userId);
   await supabase.from('user_profiles').delete().eq('id', userId);
-  await supabase.from('profiles').delete().eq('id', userId);
 
     // Delete user from Supabase Auth
     const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {

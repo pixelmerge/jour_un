@@ -11,7 +11,22 @@ const ThemeContext = createContext({
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState('light');
-  const themeObject = theme === 'light' ? lightTheme : darkTheme;
+  const rawTheme = theme === 'light' ? lightTheme : darkTheme;
+  // Provide backward-compatible aliases expected by components:
+  // - keep rawTheme.background as an object (so theme.background.secondary still works)
+  // - make theme.background coercible to a string (so ${theme.background} yields the primary color)
+  // - keep rawTheme.palette available for new styles
+  const themeObject = {
+    ...rawTheme,
+    background: {
+      ...(rawTheme.background || {}),
+      toString() {
+        return (rawTheme.background && rawTheme.background.primary) || rawTheme.backgroundColor || '#fff';
+      }
+    },
+    // explicit convenience alias for consumers that expect a simple string
+    backgroundColor: (rawTheme.background && rawTheme.background.primary) || rawTheme.backgroundColor || '#fff'
+  };
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { useAuth } from '@/context/AuthProvider';
+import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/lib/supabaseClient';
 import { startOfDay, subDays, subWeeks, subMonths } from 'date-fns';
 import FoodLogger from './FoodLogger';
@@ -179,11 +180,12 @@ const LogButton = styled(Button)`
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { profile, loading: profileLoading, error: profileError } = useProfile(user?.id);
   const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [activeLogger, setActiveLogger] = useState(null);
   const [timelineView, setTimelineView] = useState(null);
   const [stats, setStats] = useState({
-    calories: { consumed: 0, burned: 0, target: 2000 },
+    calories: { consumed: 0, burned: 0, target: 0 },
     sleep: { hours: 0, quality: 'N/A' },
     activity: { minutes: 0, type: 'None' }
   });
@@ -204,7 +206,7 @@ export default function Dashboard() {
   }), []);
 
   const fetchStats = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
 
     setLoading(true);
     setError(null);
@@ -273,8 +275,8 @@ export default function Dashboard() {
       const avgSleepHoursPerDay = days > 0 ? Number((totalSleepHours / days).toFixed(1)) : 0;
       const latestSleepQuality = sleepData?.[0]?.quality || 'N/A';
 
-      // Compute period-based targets
-      const caloriesPerDayTarget = 2000; // TODO: user-specific
+      // Compute period-based targets using user's profile
+      const caloriesPerDayTarget = profile?.daily_calorie_target || 2000;
       const periodCalorieTarget = caloriesPerDayTarget * days;
 
       setStats({
@@ -332,16 +334,16 @@ export default function Dashboard() {
     // Auto-refresh every 5 minutes
     const interval = setInterval(fetchStats, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [user, selectedPeriod]);
+  }, [user, profile, selectedPeriod]);
 
   // Trigger a small celebration if any goal hits >= 100% for today
   useEffect(() => {
-    if (!user) return;
-    if (selectedPeriod === 'today' && ((stats.activity.minutes >= 30) || (stats.calories.consumed >= stats.calories.target) || (Number(stats.sleep.hours) >= 8))) {
+    if (!user || !profile) return;
+    if (selectedPeriod === 'today' && ((stats.activity.minutes >= (profile.activity_minutes_target || 210)) || (stats.calories.consumed >= stats.calories.target) || (Number(stats.sleep.hours) >= (profile.sleep_target_hours || 8)))) {
       setCelebrate(true);
       setTimeout(() => setCelebrate(false), 900);
     }
-  }, [user, selectedPeriod, stats.activity.minutes, stats.calories.consumed, stats.calories.target, stats.sleep.hours]);
+  }, [user, profile, selectedPeriod, stats.activity.minutes, stats.calories.consumed, stats.calories.target, stats.sleep.hours]);
 
   // Pass fetchStats to the sleep buttons
   const handleSleepStart = async () => {
@@ -379,6 +381,34 @@ export default function Dashboard() {
   };
 
   const { days, label: periodLabel } = periodMeta[selectedPeriod] || { days: 1, label: 'Today' };
+
+  // Show loading state while profile is loading
+  if (profileLoading) {
+    return (
+      <div>
+        <Header>
+          <HeaderRow>
+            <div style={{ color: '#666', fontSize: '0.9rem' }}>Loading dashboard...</div>
+          </HeaderRow>
+        </Header>
+      </div>
+    );
+  }
+
+  // Show error state if profile failed to load
+  if (profileError) {
+    return (
+      <div>
+        <Header>
+          <HeaderRow>
+            <div style={{ color: '#ff6b6b', fontSize: '0.9rem' }}>
+              Failed to load profile: {profileError}
+            </div>
+          </HeaderRow>
+        </Header>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -438,8 +468,8 @@ export default function Dashboard() {
                 const perDaySleep = Number(stats.sleep.hours || 0);
                 const pct = {
                   Calories: Math.min(100, Math.round((Number(stats.calories.consumed || 0) / Math.max(1, Number(stats.calories.target || 0))) * 100)),
-                  Sleep: Math.min(100, Math.round((perDaySleep / 8) * 100)),
-                  Activity: Math.min(100, Math.round((perDayActivity / 30) * 100)),
+                  Sleep: Math.min(100, Math.round((perDaySleep / (profile?.sleep_target_hours || 8)) * 100)),
+                  Activity: Math.min(100, Math.round((Number(stats.activity.minutes || 0) / (profile?.activity_minutes_target || 210)) * 100)),
                 }[t];
                 const circumference = 2 * Math.PI * 18;
                 return (
@@ -488,8 +518,8 @@ export default function Dashboard() {
             },
             {
               key: 'activity',
-              label: `Activity • ${selectedPeriod === 'today' ? 'Today' : 'Avg per day'}`,
-              value: `${selectedPeriod === 'today' ? stats.activity.minutes : Math.round(stats.activity.minutes / days)}min${selectedPeriod === 'today' ? '' : '/day'}`,
+              label: `Activity • ${selectedPeriod === 'today' ? 'Today' : selectedPeriod === 'week' ? 'This Week' : 'Last 30 days'}`,
+              value: `${stats.activity.minutes}min`,
               detail: `${selectedPeriod === 'today' ? 'Type' : 'Recent'}: ${stats.activity.type} • ${stats.calories.burned} cal burned`,
               action: '🏃‍♂️ Log Activity',
               delay: 0.2

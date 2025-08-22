@@ -19,78 +19,115 @@ const baseTheme = {
   },
 };
 
+// Palette inspired from the provided screenshot
+// - soft green: #6D9773
+// - deep green: #0C3B2E
+// - warm brown: #B46617
+// - bright yellow: #FFBA00
+
 export const lightTheme = {
   ...baseTheme,
-  background: {
-    primary: '#ffffff',
-    secondary: '#f8f9fa',
-    hover: '#f1f3f5',
-    accent: '#e9ecef'
+  // semantic palette
+  palette: {
+    softGreen: '#6D9773',
+    deepGreen: '#0C3B2E',
+    warmBrown: '#B46617',
+    brightYellow: '#FFBA00',
+    neutralLight: '#F6FBF7',
+    neutral: '#F2F6F3'
   },
+  // Keep older semantic fields for compatibility.
+  background: {
+    primary: '#F6FBF7',
+    secondary: '#FFFFFF',
+    hover: '#EEF7EE',
+    accent: '#F2F6F3'
+  },
+  // backward compatible alias: theme.background used in some components
+  // keep a string value that maps to the primary background color
+  backgroundColor: '#F6FBF7',
   text: {
-    primary: '#212529',
-    secondary: '#495057',
-    muted: '#868e96',
-    accent: '#2563eb'
+    primary: '#0B2B20', // dark green-ish for readability on light background
+    secondary: '#254032',
+    muted: '#6B7F72',
+    accent: '#0C3B2E'
   },
   border: {
-    primary: '#dee2e6',
-    secondary: '#e9ecef'
+    primary: '#E6EFE6',
+    secondary: '#F2F6F3'
   },
   card: {
-    background: '#ffffff',
-    border: '#e5e7eb',
-    hover: '#f8fafc'
+    background: '#FFFFFF',
+    border: '#E6EFE6',
+    hover: '#F7FBF8'
   },
   primaryButton: {
-    background: '#2563eb',
-    text: '#ffffff',
-    hover: '#1d4ed8'
+    background: '#0C3B2E',
+    text: '#FFFFFF',
+    hover: '#0a2f24'
   },
   secondaryButton: {
-    background: '#e9ecef',
-    text: '#212529',
-    hover: '#dee2e6'
+    background: '#6D9773',
+    text: '#0B2B20',
+    hover: '#5f8568'
   },
-  error: '#dc2626',
-  success: '#16a34a',
-  warning: '#ca8a04'
+  accent: {
+    warm: '#B46617',
+    bright: '#FFBA00'
+  },
+  error: '#DC2626',
+  success: '#16A34A',
+  warning: '#FFBA00'
 };
 
 export const darkTheme = {
   ...baseTheme,
-  background: {
-    primary: '#111827',
-    secondary: '#1f2937',
-    hover: '#374151',
-    accent: '#4b5563'
+  palette: {
+    softGreen: '#6D9773',
+    deepGreen: '#0C3B2E',
+    warmBrown: '#B46617',
+    brightYellow: '#FFBA00',
+    neutralDark: '#071612',
+    neutral: '#0B2B20'
   },
+  background: {
+    primary: '#071612', // very dark green tint
+    secondary: '#0B2B20',
+    hover: '#082E1F',
+    accent: '#0F3E2F'
+  },
+  // compatibility alias
+  backgroundColor: '#071612',
   text: {
-    primary: '#f9fafb',
-    secondary: '#e5e7eb',
-    muted: '#9ca3af',
-    accent: '#3b82f6'
+    primary: '#E8F6EE',
+    secondary: '#CFE9D8',
+    muted: '#95A79A',
+    accent: '#6D9773'
   },
   border: {
-    primary: '#374151',
-    secondary: '#4b5563'
+    primary: '#0E2E23',
+    secondary: '#123826'
   },
   card: {
-    background: '#1f2937',
-    border: '#374151',
-    hover: '#2d3748'
+    background: '#082E1F',
+    border: '#0E2E23',
+    hover: '#0B3B2B'
   },
   primaryButton: {
-    background: '#3b82f6',
-    text: '#ffffff',
-    hover: '#2563eb'
+    background: '#6D9773',
+    text: '#071612',
+    hover: '#5f8568'
   },
   secondaryButton: {
-    background: '#374151',
-    text: '#f9fafb',
-    hover: '#4b5563'
+    background: '#0C3B2E',
+    text: '#E8F6EE',
+    hover: '#0a3227'
   },
-  error: '#ef4444',
-  success: '#22c55e',
-  warning: '#eab308'
+  accent: {
+    warm: '#B46617',
+    bright: '#FFBA00'
+  },
+  error: '#EF4444',
+  success: '#22C55E',
+  warning: '#FFBA00'
 };

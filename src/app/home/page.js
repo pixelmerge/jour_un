@@ -1,9 +1,10 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import styled from '@emotion/styled';
+import { supabase } from '@/lib/supabaseClient';
 
 const Dashboard = dynamic(() => import('@/components/Dashboard'), { 
   ssr: false,
@@ -33,22 +34,37 @@ export default function HomePage() {
   const { user, loading, refreshSession } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
   useEffect(() => {
     if (searchParams?.get('auth') === 'success') {
-      console.log('Auth success detected, refreshing session...');
       refreshSession();
     }
   }, [searchParams, refreshSession]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      console.log('No user found, redirecting to login...');
-      router.push('/login');
+    async function checkOnboarding() {
+      if (!loading) {
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('onboarding_complete')
+            .eq('id', user.id)
+            .single();
+          if (!profile || profile.onboarding_complete !== true) {
+            router.push('/onboarding');
+            return;
+          }
+        } else {
+          router.push('/login');
+        }
+      }
+      setCheckingOnboarding(false);
     }
+    checkOnboarding();
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading || checkingOnboarding) {
     return <LoadingContainer>Loading...</LoadingContainer>;
   }
 

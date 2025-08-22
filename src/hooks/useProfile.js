@@ -12,28 +12,16 @@ export function useProfile(userId) {
         setLoading(true);
         setError(null);
 
-        // Fetch both profile tables in parallel
-        const [profileResult, userProfileResult] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single(),
-          supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', userId)
-            .single()
-        ]);
+        // Fetch from unified user_profiles table
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-        if (profileResult.error) throw profileResult.error;
-        if (userProfileResult.error) throw userProfileResult.error;
-
-        // Combine both profiles
-        setProfile({
-          ...profileResult.data,
-          ...userProfileResult.data
-        });
+        if (error) throw error;
+        
+        setProfile(data);
       } catch (err) {
         console.error('Error loading profile:', err);
         setError(err.message);

@@ -18,7 +18,7 @@ export async function POST(req) {
 
     // 2. Fetch user's profile (goals) and recent entries
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('user_profiles')
       .select('physical_goal, nutrition_goal, activity_goal')
       .eq('id', user.id)
       .single();
