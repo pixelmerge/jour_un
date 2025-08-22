@@ -47,6 +47,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [oauthError, setOauthError] = useState(null);
   const router = useRouter();
 
   const handleLogin = async (e) => {
@@ -64,12 +65,30 @@ export default function LoginPage() {
   };
   
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    setOauthError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error('Google OAuth error:', error);
+        setOauthError(error.message || 'Failed to start Google sign-in');
+        return;
+      }
+
+      // Some SDK versions return a url to redirect to. If present, navigate there.
+      if (data?.url) {
+        window.location.href = data.url;
+      }
+      // Otherwise the SDK should have already redirected the browser.
+    } catch (err) {
+      console.error('Error starting Google sign-in:', err);
+      setOauthError('Failed to start Google sign-in');
+    }
   };
 
   return (
@@ -86,8 +105,9 @@ export default function LoginPage() {
         {error && <p style={{ color: 'red' }}>{error}</p>}
         <Button type="submit">Log In</Button>
       </Form>
-      <p>or</p>
-      <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
+  <p>or</p>
+  {oauthError && <p style={{ color: 'red' }}>{oauthError}</p>}
+  <GoogleButton onClick={handleGoogleLogin}>Sign in with Google</GoogleButton>
   <p>Don&apos;t have an account? <a href="/signup">Sign Up</a></p>
     </Container>
   );

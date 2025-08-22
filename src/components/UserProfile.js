@@ -619,15 +619,18 @@ export default function UserProfile() {
     }
 
     try {
-      // Call the delete account API
+      // Call the delete account API (server expects POST with userId)
       const response = await fetch('/api/delete-account', {
-        method: 'DELETE',
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ userId: user.id }),
       });
 
       if (!response.ok) {
+        const txt = await response.text();
+        console.error('Delete account failed:', txt);
         throw new Error('Failed to delete account');
       }
 
